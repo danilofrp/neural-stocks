@@ -21,23 +21,23 @@ def insertMissingDays(df):
             else:
                 df.loc[start, 'Holiday'] = 0
         start += step
-    
+
     return df
 
 #%%
 def acquireData(path, assetType, asset, samplingFrequency, replicateForHolidays = False):
     filepath = path + '/' + assetType + '/' + asset + '/' + samplingFrequency + '/' + asset + '.CSV'
-    
+
     df = pd.read_csv(filepath, delimiter=';', decimal=',',
                      parse_dates=['Date'], dayfirst=True, index_col='Date')
     df = df.sort_index() #csv entries begin from most recent to older dates
-    
+
     if replicateForHolidays:
         df.loc[:,'Holiday'] = 0
         df = insertMissingDays(df)
-    
+
     df['Close_r'] = np.log(df.Close/df.Close.shift(1))
-    
+
     return df
 
 #%%
@@ -45,7 +45,7 @@ def plot_returnSeries(df, asset, initialDate = '', finalDate = ''):
     initialDate = initialDate if initialDate else df.index[0].strftime('%Y-%m-%d')
     finalDate = finalDate if finalDate else df.index[-1].strftime('%Y-%m-%d')
     title = asset + ' (' + initialDate + ')' if initialDate == finalDate else asset + ' (' + initialDate + ' to ' + finalDate + ')'
-    
+
     fig, ax = plt.subplots(figsize=(10,10), nrows = 2, ncols = 1, sharex = True)
 
     plot_data = df[initialDate:finalDate]
@@ -63,7 +63,7 @@ def plot_returnSeries(df, asset, initialDate = '', finalDate = ''):
 def plot_seasonalDecompose(title, df, column, initialDate = '', finalDate = '', frequency = 1):
     initialDate = initialDate if initialDate else df.index[0].strftime('%Y-%m-%d')
     finalDate = finalDate if finalDate else df.index[-1].strftime('%Y-%m-%d')
-    
+
     result = seasonal_decompose(df[column][initialDate:finalDate].values, model='additive', freq=frequency, two_sided=False)
 
     fig, ax = plt.subplots(figsize=(10,15), nrows = 4, ncols = 1)
@@ -95,7 +95,7 @@ assetType = 'stocks'
 asset = 'PETR4'
 frequency = 'diario'
 
-df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = False)
+df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = True)
 
 #%%
 %matplotlib inline
