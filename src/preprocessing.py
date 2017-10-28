@@ -1,3 +1,4 @@
+# <editor-fold> IMPORTS
 #%%
 import numpy as np
 import pandas as pd
@@ -5,7 +6,9 @@ import matplotlib.pyplot as plt
 from datetime import date, datetime, timedelta
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import periodogram
+# </editor-fold>
 
+# <editor-fold> FUNCTIONS DEF
 #%%
 def insertMissingDays(df):
     start = datetime(2000, 3, 1)
@@ -24,7 +27,6 @@ def insertMissingDays(df):
 
     return df
 
-#%%
 def acquireData(path, assetType, asset, samplingFrequency, replicateForHolidays = False):
     filepath = path + '/' + assetType + '/' + asset + '/' + samplingFrequency + '/' + asset + '.CSV'
 
@@ -40,7 +42,6 @@ def acquireData(path, assetType, asset, samplingFrequency, replicateForHolidays 
 
     return df
 
-#%%
 def plot_returnSeries(df, asset, initialDate = '', finalDate = ''):
     initialDate = initialDate if initialDate else df.index[0].strftime('%Y-%m-%d')
     finalDate = finalDate if finalDate else df.index[-1].strftime('%Y-%m-%d')
@@ -59,7 +60,18 @@ def plot_returnSeries(df, asset, initialDate = '', finalDate = ''):
     ax[1].plot(plot_data['Close_r'])
     ax[1].grid()
 
-#%%
+def plot_periodogram(df, column, initialLag = 0, numberOfLags = 30, yLog = False):
+    pgram = periodogram(df[column])
+    length = len(pgram) if len(pgram) < numberOfLags else numberOfLags + 1
+
+    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
+    plot_data = pgram[initialLag:length]
+    plt.xlabel('Lags')
+    ax.set_title('Periodogram')
+    if yLog:
+        plt.yscale('log')
+    ax.stem(range(initialLag, length), plot_data)
+
 def plot_seasonalDecompose(title, df, column, initialDate = '', finalDate = '', frequency = 1):
     initialDate = initialDate if initialDate else df.index[0].strftime('%Y-%m-%d')
     finalDate = finalDate if finalDate else df.index[-1].strftime('%Y-%m-%d')
@@ -88,12 +100,15 @@ def plot_seasonalDecompose(title, df, column, initialDate = '', finalDate = '', 
     ax[3].set_title('resid')
     ax[3].plot(df[initialDate:finalDate].index,result.resid)
     ax[3].grid()
+# </editor-fold>
 
+# <editor-fold> Data Info
 #%%
 dataPath = '/home/danilofrp/projeto_final/data'
 assetType = 'stocks'
 asset = 'PETR4'
 frequency = 'diario'
+# </editor-fold>
 
 df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = True)
 
@@ -103,5 +118,9 @@ plot_returnSeries(df, asset, '2008', '2008')
 
 #%%
 %matplotlib inline
+plot_periodogram(df, 'Close', initialLag = 0, numberOfLags = 30, yLog = False)
+
+#%%
+%matplotlib inline
 #%matplotlib tk
-plot_seasonalDecompose((asset + ' Close Price (2008-05 to 2008-10)'), df, 'Close', '2008-05', '2008-10', 5)
+plot_seasonalDecompose((asset + ' Close Price (2008-05 to 2008-10)'), df, 'Close', '2008-05', '2008-10', 8)
