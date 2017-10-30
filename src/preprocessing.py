@@ -4,7 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import date, datetime, timedelta
 from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.tsa.stattools import periodogram
+from statsmodels.tsa.arima_model import ARIMA, ARIMAResults
+from statsmodels.tsa.stattools import periodogram, adfuller, acf, pacf
 from math import isnan
 # </editor-fold>
 
@@ -41,14 +42,14 @@ def acquireData(path, assetType, asset, samplingFrequency, replicateForHolidays 
 
     return df
 
-def plot_returnSeries(df, asset, initialDate = '', finalDate = ''):
-    initialDate = initialDate if initialDate else df.index[0].strftime('%Y-%m-%d')
-    finalDate = finalDate if finalDate else df.index[-1].strftime('%Y-%m-%d')
-    title = asset + ' (' + initialDate + ')' if initialDate == finalDate else asset + ' (' + initialDate + ' to ' + finalDate + ')'
+def plot_returnSeries(df, asset, initialPlotDate = '', finalPlotDate = ''):
+    initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
+    finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
+    title = asset + ' (' + initialPlotDate + ')' if initialPlotDate == finalPlotDate else asset + ' (' + initialPlotDate + ' to ' + finalPlotDate + ')'
 
     fig, ax = plt.subplots(figsize=(10,10), nrows = 2, ncols = 1, sharex = True)
 
-    plot_data = df[initialDate:finalDate]
+    plot_data = df[initialPlotDate:finalPlotDate]
     plt.xlabel('Date')
     ax[0].set_title(title)
     ax[0].set_ylabel('Price')
@@ -73,38 +74,68 @@ def plot_periodogram(df, column, initialLag = 0, numberOfLags = 30, yLog = False
         plt.yscale('log')
     ax.stem(range(initialLag, length), plot_data)
 
-def plot_seasonalDecompose(title, df, column, initialDate = '', finalDate = '', frequency = 1):
-    initialDate = initialDate if initialDate else df.index[0].strftime('%Y-%m-%d')
-    finalDate = finalDate if finalDate else df.index[-1].strftime('%Y-%m-%d')
+def plot_seasonalDecompose(df, asset, column, initialPlotDate = '', finalPlotDate = '', frequency = 1):
+    if isnan(df[column].iloc[0]):
+        df = df.drop(df.index[0])
+    initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
+    finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
+    title = asset + column + ' (' + initialPlotDate + ')' if initialPlotDate == finalPlotDate else asset + ' (' + initialPlotDate + ' to ' + finalPlotDate + ')'
+    initialIndex = np.where(df.index == df[initialPlotDate:finalPlotDate].index[0])[0][0]
+    finalIndex = np.where(df.index == df[initialPlotDate:finalPlotDate].index[-1])[0][0] + 1
 
-    result = seasonal_decompose(df[column][initialDate:finalDate].values, model='additive', freq=frequency, two_sided=False)
+    result = seasonal_decompose(df[column].values, model='additive', freq=frequency, two_sided=False)
 
     fig, ax = plt.subplots(figsize=(10,15), nrows = 4, ncols = 1)
 
-    plot_data = df[initialDate:finalDate]
+    plot_data = df[initialPlotDate:finalPlotDate]
     plt.xlabel('Date')
     ax[0].set_title(title)
-    ax[0].plot(df[initialDate:finalDate].index,plot_data[column],'b-')
-    #ax[0].plot(df[initialDate:finalDate].index,plot_data['Open'],'r:')
-    #ax[0].plot(df[initialDate:finalDate].index,plot_data['High'],'g:')
-    #ax[0].plot(df[initialDate:finalDate].index,plot_data['Low'],'g:')
+    ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data[column],'b-')
+    #ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data['Open'],'r:')
+    #ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data['High'],'g:')
+    #ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data['Low'],'g:')
     ax[0].grid()
 
     ax[1].set_title('trend')
-    ax[1].plot(df[initialDate:finalDate].index,result.trend)
+    ax[1].plot(df[initialPlotDate:finalPlotDate].index,result.trend[initialIndex:finalIndex])
     ax[1].grid()
 
     ax[2].set_title('seasonal')
-    ax[2].plot(df[initialDate:finalDate].index,result.seasonal)
+    ax[2].plot(df[initialPlotDate:finalPlotDate].index,result.seasonal[initialIndex:finalIndex])
     ax[2].grid()
 
     ax[3].set_title('resid')
-    ax[3].plot(df[initialDate:finalDate].index,result.resid)
+    ax[3].plot(df[initialPlotDate:finalPlotDate].index,result.resid[initialIndex:finalIndex])
     ax[3].grid()
+
+def test_stationarity(ts, window, initialPlotDate='', finalPlotDate=''):
+    if isnan(ts.iloc[0]):
+        ts = ts.drop(ts.index[0])
+    initialPlotDate = initialPlotDate if initialPlotDate else ts.index[0]
+    finalPlotDate = finalPlotDate if finalPlotDate else ts.index[-1]
+
+    #Determing rolling statistics
+    rolmean = ts.rolling(window=window,center=False).mean()
+    rolstd = ts.rolling(window=window,center=False).std()
+
+    fig, ax = plt.subplots(figsize=(15,10), nrows = 1, ncols = 1, sharex = True)
+    #Plot rolling statistics:
+    ax.plot(ts[initialPlotDate:finalPlotDate], color='blue',label='Original')
+    ax.plot(rolmean[initialPlotDate:finalPlotDate], color='red', label='Rolling Mean')
+    ax.plot(rolstd[initialPlotDate:finalPlotDate], color='black', label = 'Rolling Std')
+    ax.legend(loc='best')
+    ax.set_title('Rolling Mean & Standard Deviation')
+
+    #Perform Dickey-Fuller test:
+    print 'Results of Dickey-Fuller Test:'
+    dftest = adfuller(ts, autolag='AIC')
+    dfoutput = pd.Series(dftest[0:4], index=['Test Statistic','p-value','#Lags Used','Number of Observations Used'])
+    for key,value in dftest[4].items():
+        dfoutput['Critical Value (%s)'%key] = value
+    print dfoutput
 # </editor-fold>
 
-# <editor-fold> Data Info
-#%%
+# <editor-fold> DATA INFO
 dataPath = '/home/danilofrp/projeto_final/data'
 assetType = 'stocks'
 asset = 'PETR4'
@@ -113,11 +144,10 @@ frequency = 'diario'
 
 df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = True)
 
-#%%
-plot_returnSeries(df, asset, '2008', '2008')
+plot_returnSeries(df, asset, initialPlotDate='2016', finalPlotDate='2016')
 
-#%%
 plot_periodogram(df, 'Close_r', initialLag = 0, numberOfLags = 30, yLog = False)
 
-#%%
-plot_seasonalDecompose((asset + ' Close Price (2008-05 to 2008-10)'), df, 'Close_r', '2008', '2008', 5)
+plot_seasonalDecompose(df, asset, 'Close_r', initialPlotDate='2016', finalPlotDate='2016', frequency=5)
+
+test_stationarity(df['Close_r'][:'2016'], window=5, initialPlotDate='2016', finalPlotDate='2016')
