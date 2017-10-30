@@ -40,7 +40,7 @@ def acquireData(path, assetType, asset, samplingFrequency, replicateForHolidays 
 
     df['Close_r'] = np.log(df.Close/df.Close.shift(1))
 
-    return df
+    return df.drop(df.index[0])
 
 def plot_returnSeries(df, asset, initialPlotDate = '', finalPlotDate = ''):
     initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
@@ -133,6 +133,27 @@ def test_stationarity(ts, window, initialPlotDate='', finalPlotDate=''):
     for key,value in dftest[4].items():
         dfoutput['Critical Value (%s)'%key] = value
     print dfoutput
+
+def plot_acfAndPacf(df, lags):
+    lag_acf = acf(df, nlags=lags)
+    lag_pacf = pacf(df, nlags=lags, method='ols')
+
+    fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 2)
+
+    #Plot ACF:
+    ax[0].stem(lag_acf)
+    ax[0].axhline(y=0,linestyle='--',color='gray')
+    ax[0].axhline(y=-7.96/np.sqrt(len(df)),linestyle='--',color='gray')
+    ax[0].axhline(y=7.96/np.sqrt(len(df)),linestyle='--',color='gray')
+    ax[0].set_title('Autocorrelation Function')
+
+    #Plot PACF:
+    ax[1].stem(lag_pacf)
+    ax[1].axhline(y=0,linestyle='--',color='gray')
+    ax[1].axhline(y=-7.96/np.sqrt(len(df)),linestyle='--',color='gray')
+    ax[1].axhline(y=7.96/np.sqrt(len(df)),linestyle='--',color='gray')
+    ax[1].set_title('Partial Autocorrelation Function')
+    plt.tight_layout()
 # </editor-fold>
 
 # <editor-fold> DATA INFO
@@ -151,3 +172,12 @@ plot_periodogram(df, 'Close_r', initialLag = 0, numberOfLags = 30, yLog = False)
 plot_seasonalDecompose(df, asset, 'Close_r', initialPlotDate='2016', finalPlotDate='2016', frequency=5)
 
 test_stationarity(df['Close_r'][:'2016'], window=5, initialPlotDate='2016', finalPlotDate='2016')
+
+plot_acfAndPacf(df['Close_r'], 15)
+
+model = ARIMA(df['Close_r'][:'2016'], order=(2, 1, 1))
+results_ARIMA = model.fit(disp=-1)
+plt.plot(df['Close_r']['2016-07':'2016-12'])
+plt.plot(results_ARIMA.fittedvalues['2016-07':'2016-12'], color='red')
+plt.title('RSS: %.4f'% sum((results_ARIMA.fittedvalues['2016-07':'2016-12']-df['Close_r']['2016-07':'2016-12'])**2))
+plt.axhline(y=0,linestyle='--',color='gray')
