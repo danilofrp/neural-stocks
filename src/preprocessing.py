@@ -1,15 +1,14 @@
 # <editor-fold> IMPORTS
-#%%
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import date, datetime, timedelta
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import periodogram
+from math import isnan
 # </editor-fold>
 
 # <editor-fold> FUNCTIONS DEF
-#%%
 def insertMissingDays(df):
     start = datetime(2000, 3, 1)
     end = datetime(2017, 9, 1)
@@ -61,6 +60,8 @@ def plot_returnSeries(df, asset, initialDate = '', finalDate = ''):
     ax[1].grid()
 
 def plot_periodogram(df, column, initialLag = 0, numberOfLags = 30, yLog = False):
+    if isnan(df[column].iloc[0]):
+        df = df.drop(df.index[0])
     pgram = periodogram(df[column])
     length = len(pgram) if len(pgram) < numberOfLags else numberOfLags + 1
 
@@ -113,14 +114,10 @@ frequency = 'diario'
 df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = True)
 
 #%%
-%matplotlib inline
 plot_returnSeries(df, asset, '2008', '2008')
 
 #%%
-%matplotlib inline
-plot_periodogram(df, 'Close', initialLag = 0, numberOfLags = 30, yLog = False)
+plot_periodogram(df, 'Close_r', initialLag = 0, numberOfLags = 30, yLog = False)
 
 #%%
-%matplotlib inline
-#%matplotlib tk
-plot_seasonalDecompose((asset + ' Close Price (2008-05 to 2008-10)'), df, 'Close', '2008-05', '2008-10', 8)
+plot_seasonalDecompose((asset + ' Close Price (2008-05 to 2008-10)'), df, 'Close_r', '2008', '2008', 5)
