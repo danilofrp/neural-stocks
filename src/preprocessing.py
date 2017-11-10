@@ -64,19 +64,49 @@ def plot_returnSeries(df, asset, initialPlotDate = '', finalPlotDate = '', saveI
     if saveImg:
         fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/returns{}.png'.format(asset, saveIndex), bbox_inches='tight')
 
-def plot_periodogram(df, column, initialLag = 0, numberOfLags = 30, yLog = False, saveImg = False, saveIndex = ''):
+def deTrend(df, column, window, fitOrder = 1, plot = False, initialPlotDate = None, finalPlotDate = None):
+    if window < fitOrder + 1:
+        window = fitOrder +1
+        print 'Warning: window must be at least {} samples wide for a fit of order {}. Adjusting window for minimal value.'.format(fitOrder+1, fitOrder)
+    trendName = 'trend_' + column
+    residualName = 'residual_' + column
+    df[trendName] = np.empty(len(df[column]))*np.nan
+    x = range(0, window)
+    for i in range(0, len(df[column])-1):
+        if i <= (window - 1):
+            df[trendName].iloc[i] = np.nan
+        else:
+            y = df[column][(i - window):i].values
+            a = np.polyfit(x, y, fitOrder)
+            prediction = 0
+            for j in range(fitOrder, -1, -1):
+                prediction += a[fitOrder - j]*(window**j)
+            df.set_value(df.index[i+1], trendName, prediction)
+    df[residualName] = df[column] - df[trendName]
+
+    if plot:
+        initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
+        finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
+        fig, ax = plt.subplots(figsize=(15,10), nrows = 2, ncols = 1, sharex = True)
+        plt.xlabel('Date')
+        ax[0].set_title('Trend Predictions')
+        ax[0].set_ylabel('Price')
+        ax[0].plot(df[column][initialPlotDate:finalPlotDate])
+        ax[0].plot(df[trendName][initialPlotDate:finalPlotDate])
+        ax[1].plot(df[residualName][initialPlotDate:finalPlotDate])
+
+def plot_periodogram(df, column, numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = ''):
     if isnan(df[column].iloc[0]):
         df = df.drop(df.index[0])
     pgram = periodogram(df[column])
     length = len(pgram) if len(pgram) < numberOfLags else numberOfLags + 1
 
     fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1, sharex = True)
-    plot_data = pgram[initialLag:length]
     plt.xlabel('Lags')
     ax.set_title('Periodogram')
     if yLog:
         plt.yscale('log')
-    ax.stem(range(initialLag, length), plot_data)
+    ax.stem(range(initialLag, length), pgram[initialLag:length])
 
     if saveImg:
         fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/periodogram{}.png'.format(asset, saveIndex), bbox_inches='tight')
@@ -185,32 +215,35 @@ def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
 
 # <editor-fold> DATA INFO
 dataPath = '/home/danilofrp/projeto_final/data'
-assetType = 'forex'
-asset = 'USDBRL'
+assetType = 'stocks'
+asset = 'PETR4'
 frequency = 'diario'
 # </editor-fold>
 
 df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = True)
 
-plot_returnSeries(df, asset, initialPlotDate='2016', finalPlotDate='2016', saveImg = True, saveIndex = '')
+plot_returnSeries(df, asset, initialPlotDate='2016-10', finalPlotDate='2016-12', saveImg = False, saveIndex = '1')
 
-plot_periodogram(df, 'Close', initialLag = 0, numberOfLags = 30, yLog = False, saveImg = True, saveIndex = '1')
+deTrend(df, column = 'Close', window = 4, fitOrder = 1, plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
-plot_seasonalDecompose(df, asset, 'Close_r', initialPlotDate='2016', finalPlotDate='2016', frequency=10, saveImg = True, saveIndex = '2')
+plot_periodogram(df[8:], 'Close', numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = '4')
 
-test_stationarity(df['Close_r'][:'2016'], window=10, initialPlotDate='2016', finalPlotDate='2016', saveImg = True, saveIndex = '1')
+plot_seasonalDecompose(df, asset, 'Close', initialPlotDate='2016', finalPlotDate='2016', frequency=8, saveImg = False, saveIndex = '5')
 
-plot_acfAndPacf(df['Close_r'], 10, saveImg = True, saveIndex = '1')
+test_stationarity(df['Close_r'][:'2016'], window=10, initialPlotDate='2016', finalPlotDate='2016', saveImg = False, saveIndex = '1')
 
+plot_acfAndPacf(df['Close_r'], 10, saveImg = False, saveIndex = '1')
+
+# <editor-fold> ARIMA
 model = ARIMA(df['Close_r'][:'2016'], order=(2, 1, 1))
 results_ARIMA = model.fit(disp=-1)
 fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1, sharex = True)
 #ax.plot(results_ARIMA.resid['2016-07':'2016-12'])
 ax.plot(df['Close_r']['2016-07':'2016-12'])
-ax.plot(-results_ARIMA.fittedvalues['2016-07':'2016-12'].shift(-1), color='red')
+ax.plot(results_ARIMA.fittedvalues['2016-07':'2016-12'], color='red')
 ax.axhline(y=0,linestyle='--',color='gray')
-ax.set_title('RSS: %.4f'% sum((-results_ARIMA.fittedvalues['2016-07':'2016-12'].shift(-1)-df['Close_r']['2016-07':'2016-12'])**2))
-fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/arima_fitted4.png'.format(asset), bbox_inches='tight')
+ax.set_title('RSS: %.4f'% sum((results_ARIMA.fittedvalues['2016-07':'2016-12']-df['Close_r']['2016-07':'2016-12'])**2))
+#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/arima_fitted3.png'.format(asset), bbox_inches='tight')
 
 
 print(results_ARIMA.summary())
@@ -229,4 +262,51 @@ fig, ax = plt.subplots(figsize=(15,10), nrows = 1, ncols = 1, sharex = True)
 ax.plot(df['Close'][:'2016'])
 ax.plot(predictions_ARIMA[:'2016'])
 ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:'2016'])**2)/len(df['Close'][:'2016'])))
-fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/close_fitted1.png'.format(asset), bbox_inches='tight')
+#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/close_fitted1.png'.format(asset), bbox_inches='tight')
+
+
+freq = 4
+filt = None
+if filt is None:
+    if freq % 2 == 0:  # split weights at ends
+        filt = np.array([.5] + [1] * (freq - 1) + [.5]) / freq
+    else:
+        filt = np.repeat(1./freq, freq)
+print filt
+# </editor-fold>
+
+# <editor-fold> MISC
+
+window = 5
+offset = 6
+data = df['Close'][0+offset:window+1+offset].values
+a = np.polyfit(range(0, window), data[0:window], 1)
+fit = np.empty(window)*np.nan
+for i in range(0, window):
+    fit[i] = a[0]*i + a[1]
+prediction = a[0]*window + a[1]
+fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1, sharex = True)
+ax.scatter(range(0,window+1), data)
+ax.plot(range(0, window), fit, color='r')
+ax.plot(window, prediction, 'go')
+
+def plot_deTrend_RSS(df, column, fitOrder = 1, windowMaxSize = 30):
+    df2 = df.copy()
+    RSS = np.empty(windowMaxSize + 1)*np.nan
+    for i in range(fitOrder + 1, windowMaxSize + 1):
+        deTrend(df2, column = column, window = i, fitOrder = fitOrder)
+        RSS[i] = np.square(df2['residual_{}'.format(column)]).sum()
+    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
+    ax.set_title('RSS for each detrend window size')
+    ax.set_xlabel('Window size')
+    ax.set_ylabel('RSS')
+    ax.plot(range(0,windowMaxSize+1), RSS, 'bo')
+    minValue = min(RSS[fitOrder + 1 : windowMaxSize + 1])
+    for i in range(fitOrder + 1, windowMaxSize + 1):
+        if RSS[i] == minValue:
+            minIndex = i
+    plt.annotate('local min', size = 18, xy=(minIndex*1.01, minValue*1.01), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
+
+plot_deTrend_RSS(df, 'Close', fitOrder = 1, windowMaxSize = 15)
+
+# </editor-fold>
