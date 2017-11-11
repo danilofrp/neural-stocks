@@ -62,7 +62,7 @@ def plot_returnSeries(df, asset, initialPlotDate = '', finalPlotDate = '', saveI
     ax[1].grid()
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/returns{}.png'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/returns{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
 
 def deTrend(df, column, window, fitOrder = 1, plot = False, initialPlotDate = None, finalPlotDate = None):
     if window < fitOrder + 1:
@@ -72,8 +72,8 @@ def deTrend(df, column, window, fitOrder = 1, plot = False, initialPlotDate = No
     residualName = 'residual_' + column
     df[trendName] = np.empty(len(df[column]))*np.nan
     x = range(0, window)
-    for i in range(0, len(df[column])-1):
-        if i <= (window - 1):
+    for i in range(0, len(df[column])):
+        if i < (window):
             df[trendName].iloc[i] = np.nan
         else:
             y = df[column][(i - window):i].values
@@ -81,8 +81,8 @@ def deTrend(df, column, window, fitOrder = 1, plot = False, initialPlotDate = No
             prediction = 0
             for j in range(fitOrder, -1, -1):
                 prediction += a[fitOrder - j]*(window**j)
-            df.set_value(df.index[i+1], trendName, prediction)
-    df[residualName] = df[column] - df[trendName]
+            df.set_value(df.index[i], trendName, prediction)
+    df[residualName] = df[column] / df[trendName]
 
     if plot:
         initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
@@ -94,6 +94,25 @@ def deTrend(df, column, window, fitOrder = 1, plot = False, initialPlotDate = No
         ax[0].plot(df[column][initialPlotDate:finalPlotDate])
         ax[0].plot(df[trendName][initialPlotDate:finalPlotDate])
         ax[1].plot(df[residualName][initialPlotDate:finalPlotDate])
+
+def plot_deTrend_RSS(df, column, fitOrder = 1, windowMaxSize = 30, saveImg = False, saveIndex = ''):
+    df2 = df.copy()
+    RSS = np.empty(windowMaxSize + 1)*np.nan
+    for i in range(fitOrder + 1, windowMaxSize + 1):
+        deTrend(df2, column = column, window = i, fitOrder = fitOrder)
+        RSS[i] = np.square(df2['residual_{}'.format(column)]).sum()
+    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
+    ax.set_title('RSS for each detrend window size')
+    ax.set_xlabel('Window size')
+    ax.set_ylabel('RSS')
+    ax.plot(range(0,windowMaxSize+1), RSS, 'bo')
+    minValue = min(RSS[fitOrder + 1 : windowMaxSize + 1])
+    for i in range(fitOrder + 1, windowMaxSize + 1):
+        if RSS[i] == minValue:
+            minIndex = i
+    plt.annotate('local min', size = 18, xy=(minIndex*1.01, minValue*1.01), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
+    if saveImg:
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/detrend_RSS{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
 
 def plot_periodogram(df, column, numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = ''):
     if isnan(df[column].iloc[0]):
@@ -109,7 +128,7 @@ def plot_periodogram(df, column, numberOfLags = 30, initialLag = 0, yLog = False
     ax.stem(range(initialLag, length), pgram[initialLag:length])
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/periodogram{}.png'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/periodogram{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
 
 def plot_seasonalDecompose(df, asset, column, initialPlotDate = '', finalPlotDate = '', frequency = 1, saveImg = False, saveIndex = ''):
     if isnan(df[column].iloc[0]):
@@ -120,7 +139,7 @@ def plot_seasonalDecompose(df, asset, column, initialPlotDate = '', finalPlotDat
     initialIndex = np.where(df.index == df[initialPlotDate:finalPlotDate].index[0])[0][0]
     finalIndex = np.where(df.index == df[initialPlotDate:finalPlotDate].index[-1])[0][0] + 1
 
-    result = seasonal_decompose(df[column].values, model='additive', freq=frequency, two_sided=False)
+    result = seasonal_decompose(df[column].values, model='a', freq=frequency, two_sided=False)
 
     fig, ax = plt.subplots(figsize=(10,15), nrows = 4, ncols = 1)
 
@@ -146,7 +165,7 @@ def plot_seasonalDecompose(df, asset, column, initialPlotDate = '', finalPlotDat
     ax[3].grid()
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/seasonal_decompose{}.png'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/seasonal_decompose{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
 
 def test_stationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg = False, saveIndex = ''):
     if isnan(ts.iloc[0]):
@@ -184,7 +203,7 @@ def test_stationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg 
     plt.figtext(0.1, -0.175, 'Critical Value (10%) {:39.6f}'.format(dfoutput['Critical Value (10%)']), size = 14)
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/test_stationarity{}.png'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/test_stationarity{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
 
 def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
     lag_acf = acf(df, nlags=lags)
@@ -210,7 +229,7 @@ def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
     plt.tight_layout()
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/acf_pacf{}.png'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/acf_pacf{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
 # </editor-fold>
 
 # <editor-fold> DATA INFO
@@ -224,11 +243,11 @@ df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = T
 
 plot_returnSeries(df, asset, initialPlotDate='2016-10', finalPlotDate='2016-12', saveImg = False, saveIndex = '1')
 
-deTrend(df, column = 'Close', window = 4, fitOrder = 1, plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
+deTrend(df, column = 'Close', window = 8, fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017')
 
-plot_periodogram(df[8:], 'Close', numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = '4')
+plot_periodogram(df, 'Close', numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = '4')
 
-plot_seasonalDecompose(df, asset, 'Close', initialPlotDate='2016', finalPlotDate='2016', frequency=8, saveImg = False, saveIndex = '5')
+plot_seasonalDecompose(df, asset, 'Close', initialPlotDate='2016', finalPlotDate='2017', frequency=5, saveImg = False, saveIndex = '5')
 
 test_stationarity(df['Close_r'][:'2016'], window=10, initialPlotDate='2016', finalPlotDate='2016', saveImg = False, saveIndex = '1')
 
@@ -243,7 +262,7 @@ ax.plot(df['Close_r']['2016-07':'2016-12'])
 ax.plot(results_ARIMA.fittedvalues['2016-07':'2016-12'], color='red')
 ax.axhline(y=0,linestyle='--',color='gray')
 ax.set_title('RSS: %.4f'% sum((results_ARIMA.fittedvalues['2016-07':'2016-12']-df['Close_r']['2016-07':'2016-12'])**2))
-#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/arima_fitted3.png'.format(asset), bbox_inches='tight')
+#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/arima_fitted3.pdf'.format(asset), bbox_inches='tight')
 
 
 print(results_ARIMA.summary())
@@ -262,23 +281,14 @@ fig, ax = plt.subplots(figsize=(15,10), nrows = 1, ncols = 1, sharex = True)
 ax.plot(df['Close'][:'2016'])
 ax.plot(predictions_ARIMA[:'2016'])
 ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:'2016'])**2)/len(df['Close'][:'2016'])))
-#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/close_fitted1.png'.format(asset), bbox_inches='tight')
+#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/close_fitted1.pdf'.format(asset), bbox_inches='tight')
 
-
-freq = 4
-filt = None
-if filt is None:
-    if freq % 2 == 0:  # split weights at ends
-        filt = np.array([.5] + [1] * (freq - 1) + [.5]) / freq
-    else:
-        filt = np.repeat(1./freq, freq)
-print filt
 # </editor-fold>
 
 # <editor-fold> MISC
 
-window = 5
-offset = 6
+window = 4
+offset = 0
 data = df['Close'][0+offset:window+1+offset].values
 a = np.polyfit(range(0, window), data[0:window], 1)
 fit = np.empty(window)*np.nan
@@ -290,23 +300,29 @@ ax.scatter(range(0,window+1), data)
 ax.plot(range(0, window), fit, color='r')
 ax.plot(window, prediction, 'go')
 
-def plot_deTrend_RSS(df, column, fitOrder = 1, windowMaxSize = 30):
-    df2 = df.copy()
-    RSS = np.empty(windowMaxSize + 1)*np.nan
-    for i in range(fitOrder + 1, windowMaxSize + 1):
-        deTrend(df2, column = column, window = i, fitOrder = fitOrder)
-        RSS[i] = np.square(df2['residual_{}'.format(column)]).sum()
-    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
-    ax.set_title('RSS for each detrend window size')
-    ax.set_xlabel('Window size')
-    ax.set_ylabel('RSS')
-    ax.plot(range(0,windowMaxSize+1), RSS, 'bo')
-    minValue = min(RSS[fitOrder + 1 : windowMaxSize + 1])
-    for i in range(fitOrder + 1, windowMaxSize + 1):
-        if RSS[i] == minValue:
-            minIndex = i
-    plt.annotate('local min', size = 18, xy=(minIndex*1.01, minValue*1.01), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
+print df[['Close', 'trend_Close']]
 
 plot_deTrend_RSS(df, 'Close', fitOrder = 1, windowMaxSize = 15)
 
+from pandas.core.nanops import nanmean as pd_nanmean
+
+freq = 5
+seasonal = pd.Series([np.nan], [df['Close'].index])
+for i in range(freq):
+    for j in range(i, len(df['residual_Close']), freq):
+        seasonal[i] = pd_nanmean(df['residual_Close'][i-freq::freq])
+#aux = np.array([pd_nanmean(df['residual_Close'][i::freq]) for i in range(freq)])
+#seasonal = np.tile(aux, len(df['Close']) // freq + 1)[4:len(df['Close'])]
+fig, ax = plt.subplots(figsize=(10,10), nrows = 2, ncols = 1, sharex = True)
+ax[0].plot(df['residual_Close'][:200].index, df['residual_Close'][:200])
+ax[1].plot(df['residual_Close'][:200].index, seasonal[:200])
 # </editor-fold>
+
+
+np.isnan(df['residual_Close'][2])
+print seasonal
+
+print df['resitual_close']
+print pd_nanmean(df['residual_Close'][5-freq::5])
+
+range(0, 10, 5)
