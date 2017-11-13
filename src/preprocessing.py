@@ -70,8 +70,8 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, plot = False, 
     if window < fitOrder + 1:
         window = fitOrder +1
         print 'Warning: window must be at least {} samples wide for a fit of order {}. Adjusting window for minimal value.'.format(fitOrder+1, fitOrder)
-    trendName = 'trend_' + column
-    residualName = 'residual_' + column
+    trendName = column + '_trend'
+    residName = column + '_resid'
     df[trendName] = np.empty(len(df[column]))*np.nan
     x = range(0, window)
     for i in range(0, len(df[column])):
@@ -85,9 +85,9 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, plot = False, 
                 prediction += a[fitOrder - j]*(window**j)
             df.set_value(df.index[i], trendName, prediction)
     if model == 'multiplicative':
-        df[residualName] = df[column] / df[trendName]
+        df[residName] = df[column] / df[trendName]
     else :
-        df[residualName] = df[column] - df[trendName]
+        df[residName] = df[column] - df[trendName]
 
     if plot:
         initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
@@ -99,26 +99,26 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, plot = False, 
         ax[1].set_title('Trend Predictions')
         ax[1].plot(df[trendName][initialPlotDate:finalPlotDate])
         ax[2].set_title('Residuals ({} model)'.format(model))
-        ax[2].plot(df[residualName][initialPlotDate:finalPlotDate])
+        ax[2].plot(df[residName][initialPlotDate:finalPlotDate])
 
 def deSeason(df, column, freq, model = 'additive', plot = False, initialPlotDate = None, finalPlotDate = None):
     model = 'multiplicative' if model.startswith('m') else 'additive'
-    trendName = 'trend_' + column
-    seasonalName = 'seasonal_' + column
-    residualName = 'residual_' + column
+    trendName = column + '_trend'
+    seasonalName = column + '_seasonal'
+    residName = column + '_resid'
     if freq > 0:
         if model == 'multiplicative':
-            df[residualName] = df[column] / df[trendName]
+            df[residName] = df[column] / df[trendName]
         else:
-            df[residualName] = df[column] - df[trendName]
+            df[residName] = df[column] - df[trendName]
         df[seasonalName] = np.empty(len(df[column]))*np.nan
-        seasonal_means = seasonal_mean(df, 'residual_Close', freq)
+        seasonal_means = seasonal_mean(df, residName, freq)
         for i in range(len(df[seasonalName])):
             df.set_value(df.index[i], seasonalName, seasonal_means[i%freq])
         if model == 'multiplicative':
-            df[residualName] /= df[seasonalName]
+            df[residName] /= df[seasonalName]
         else:
-            df[residualName] -= df[seasonalName]
+            df[residName] -= df[seasonalName]
     else:
         if model == 'multiplicative':
             df[seasonalName] = pd.Series(1, df.index)
@@ -133,7 +133,7 @@ def deSeason(df, column, freq, model = 'additive', plot = False, initialPlotDate
         ax[0].set_title('Seasonal component')
         ax[0].plot(df[seasonalName][initialPlotDate:finalPlotDate])
         ax[1].set_title('Residuals ({} model)'.format(model))
-        ax[1].plot(df[residualName][initialPlotDate:finalPlotDate])
+        ax[1].plot(df[residName][initialPlotDate:finalPlotDate])
 
 def seasonal_mean(df, column, freq):
     x = df[column].values
@@ -145,6 +145,45 @@ def seasonal_mean(df, column, freq):
             except IndexError:
                 pass
     return [pd_nanmean(m[i]) for i in range(freq)]
+
+def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5, plot = False, initialPlotDate = None, finalPlotDate = None, saveImg = False, saveIndex = ''):
+    model = 'multiplicative' if model.startswith('m') else 'additive'
+    trendName = column + '_trend'
+    seasonalName = column + '_seasonal'
+    residName = column + '_resid'
+    df[trendName] = np.empty(len(df[column]))*np.nan
+    df[seasonalName] = np.empty(len(df[column]))*np.nan
+    df[residName] = np.empty(len(df[column]))*np.nan
+
+    deTrend(df, column, window, model, fitOrder)
+    deSeason(df, column, freq, model)
+
+    if plot:
+        initialPlotDate = initialPlotDate if initialPlotDate else df[column].index[0]
+        finalPlotDate = finalPlotDate if finalPlotDate else df[column].index[-1]
+        title = asset + ' ' + column + ' (' + initialPlotDate + ')' if initialPlotDate == finalPlotDate else asset + ' ' + column + ' (' + initialPlotDate + ' to ' + finalPlotDate + ')'
+
+        fig, ax = plt.subplots(figsize=(10,15), nrows = 4, ncols = 1)
+
+        plt.xlabel('Date')
+        ax[0].set_title(title)
+        ax[0].plot(df[initialPlotDate:finalPlotDate].index, df[column][initialPlotDate:finalPlotDate])
+        ax[0].grid()
+
+        ax[1].set_title('Trend')
+        ax[1].plot(df[initialPlotDate:finalPlotDate].index,df[trendName][initialPlotDate:finalPlotDate])
+        ax[1].grid()
+
+        ax[2].set_title('Seasonal')
+        ax[2].plot(df[initialPlotDate:finalPlotDate].index,df[seasonalName][initialPlotDate:finalPlotDate])
+        ax[2].grid()
+
+        ax[3].set_title('Residuals')
+        ax[3].plot(df[initialPlotDate:finalPlotDate].index,df[residName][initialPlotDate:finalPlotDate])
+        ax[3].grid()
+
+        if saveImg:
+            fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/decompose{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
 
 def plot_deTrend_RSS(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
@@ -318,6 +357,7 @@ asset = 'PETR4'
 frequency = 'diario'
 # </editor-fold>
 
+# <editor-fold> workspace
 df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = True)
 
 plot_returnSeries(df, asset, initialPlotDate='2016-10', finalPlotDate='2016-12', saveImg = False, saveIndex = '1')
@@ -328,7 +368,9 @@ deSeason(df, 'Close', freq = 5, model = 'm', plot = True, initialPlotDate = '201
 
 plot_deTrend_RSS(df, 'Close', model = 'm', fitOrder = 1, windowMaxSize = 15)
 
-plot_deSeason_RSS(df2, 'Close', model ='m', maxFreq = 1000, saveImg = False, saveIndex = '')
+plot_deSeason_RSS(df, 'Close', model ='m', maxFreq = 10, saveImg = False, saveIndex = '')
+
+decompose(df, 'Close', model = 'm', window = 4, plot = True, initialPlotDate = '2008', finalPlotDate = '2008')
 
 plot_periodogram(df, 'Close', numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = '4')
 
@@ -337,6 +379,8 @@ plot_seasonalDecompose(df, asset, 'Close', initialPlotDate='2016', finalPlotDate
 test_stationarity(df['Close_r'][:'2016'], window=10, initialPlotDate='2016', finalPlotDate='2016', saveImg = False, saveIndex = '1')
 
 plot_acfAndPacf(df['Close_r'], 10, saveImg = False, saveIndex = '1')
+
+# </editor-fold>
 
 # <editor-fold> ARIMA
 model = ARIMA(df['Close_r'][:'2016'], order=(2, 1, 1))
