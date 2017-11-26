@@ -136,15 +136,16 @@ def deSeason(df, column, freq, model = 'additive', plot = False, initialPlotDate
         ax[1].plot(df[residName][initialPlotDate:finalPlotDate])
 
 def seasonal_mean(df, column, freq):
-    x = df[column].values
-    m = np.array([[np.nan for a in range((len(x) / freq) + 1)] for b in range(freq)])
-    for i in range((len(x)/freq) + 1):
-        for j in range(freq):
-            try:
-                m[j][i] = x[i*freq + j]
-            except IndexError:
-                pass
-    return [pd_nanmean(m[i]) for i in range(freq)]
+    return np.array([pd_nanmean(df[column][i::freq]) for i in range(freq)])
+    # x = df[column].values
+    # m = np.array([[np.nan for a in range((len(x) / freq) + 1)] for b in range(freq)])
+    # for i in range((len(x)/freq) + 1):
+    #     for j in range(freq):
+    #         try:
+    #             m[j][i] = x[i*freq + j]
+    #         except IndexError:
+    #             pass
+    # return [pd_nanmean(m[i]) for i in range(freq)]
 
 def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5, plot = False, initialPlotDate = None, finalPlotDate = None, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
@@ -192,9 +193,9 @@ def plot_deTrend_RSS(df, column, model = 'additive', fitOrder = 1, windowMaxSize
     for i in range(fitOrder + 1, windowMaxSize + 1):
         deTrend(df2, column = column, window = i, model = model, fitOrder = fitOrder)
         if model == 'multiplicative':
-            RSS[i] = np.square((df2['residual_{}'.format(column)] - 1)).sum()
+            RSS[i] = np.square((df2['{}_resid'.format(column)] - 1)).sum()
         else:
-            RSS[i] = np.square(df2['residual_{}'.format(column)]).sum()
+            RSS[i] = np.square(df2['{}_resid'.format(column)]).sum()
     fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
     ax.set_title('RSS for each deTrend window size ({} model)'.format(model))
     ax.set_xlabel('Window size')
@@ -215,9 +216,9 @@ def plot_deSeason_RSS(df, column, model ='additive', maxFreq = 20, saveImg = Fal
     for i in range(0, maxFreq + 1):
         deSeason(df2, column = column, freq = i, model = model)
         if model == 'multiplicative':
-            RSS[i] = np.square((df2['residual_{}'.format(column)] - 1)).sum()
+            RSS[i] = np.square((df2['{}_resid'.format(column)] - 1)).sum()
         else:
-            RSS[i] = np.square(df2['residual_{}'.format(column)]).sum()
+            RSS[i] = np.square(df2['{}_resid'.format(column)]).sum()
     fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
     ax.set_title('RSS for each deSeason frequency ({} model)'.format(model))
     ax.set_xlabel('Frequency (days)')
@@ -328,8 +329,8 @@ def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
     lag_pacf = pacf(df, nlags=lags, method='ols')
 
     fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 2)
-    print 'acf: {}, {}, {}, {}, {}, {}'.format(lag_acf[0], lag_acf[1], lag_acf[2], lag_acf[3], lag_acf[4], lag_acf[5], )
-    print 'pacf: {}, {}, {}, {}, {}, {}'.format(lag_pacf[0], lag_pacf[1], lag_pacf[2], lag_pacf[3], lag_pacf[4], lag_pacf[5], )
+    #print 'acf: {}, {}, {}, {}, {}, {}'.format(lag_acf[0], lag_acf[1], lag_acf[2], lag_acf[3], lag_acf[4], lag_acf[5], )
+    #print 'pacf: {}, {}, {}, {}, {}, {}'.format(lag_pacf[0], lag_pacf[1], lag_pacf[2], lag_pacf[3], lag_pacf[4], lag_pacf[5], )
 
     #Plot ACF:
     ax[0].stem(lag_acf)
@@ -360,25 +361,25 @@ frequency = 'diario'
 # <editor-fold> workspace
 df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = True)
 
-plot_returnSeries(df, asset, initialPlotDate='2016-10', finalPlotDate='2016-12', saveImg = False, saveIndex = '1')
+plot_returnSeries(df, asset, initialPlotDate='2017-05', finalPlotDate='2017-05', saveImg = False, saveIndex = '1')
 
-deTrend(df, column = 'Close', window = 8, model = 'm', fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017')
+deTrend(df, column = 'Close', window = 4, model = 'm', fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017')
 
 deSeason(df, 'Close', freq = 5, model = 'm', plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
 plot_deTrend_RSS(df, 'Close', model = 'm', fitOrder = 1, windowMaxSize = 15)
 
-plot_deSeason_RSS(df, 'Close', model ='m', maxFreq = 10, saveImg = False, saveIndex = '')
+plot_deSeason_RSS(df, 'Close', model ='a', maxFreq = 100, saveImg = False, saveIndex = '')
 
-decompose(df, 'Close', model = 'm', window = 4, plot = True, initialPlotDate = '2008', finalPlotDate = '2008')
+decompose(df, 'Close', model = 'a', window = 3, freq = 5, plot = True, initialPlotDate = '2008', finalPlotDate = '2008')
 
-plot_periodogram(df, 'Close', numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = '4')
+plot_periodogram(df[20:], 'Close_resid', numberOfLags = 500, initialLag = 2, yLog = False, saveImg = False, saveIndex = '4')
 
 plot_seasonalDecompose(df, asset, 'Close', initialPlotDate='2016', finalPlotDate='2017', frequency=5, saveImg = False, saveIndex = '5')
 
-test_stationarity(df['Close_r'][:'2016'], window=10, initialPlotDate='2016', finalPlotDate='2016', saveImg = False, saveIndex = '1')
+test_stationarity(df['Close_resid'][20:], window=20, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveIndex = '1')
 
-plot_acfAndPacf(df['Close_r'], 10, saveImg = False, saveIndex = '1')
+plot_acfAndPacf(df['Close_resid'][20:], lags = 60, saveImg = False, saveIndex = '1')
 
 # </editor-fold>
 
@@ -413,3 +414,49 @@ ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:
 #fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/close_fitted1.pdf'.format(asset), bbox_inches='tight')
 
 # </editor-fold>
+
+
+df2 = df.copy()
+windowMaxSize = 15
+maxFreq = 20
+model = 'additive'
+column = 'Close'
+RSS = np.empty((windowMaxSize + 1, maxFreq + 1), dtype=float)*0
+for i in range(2, windowMaxSize + 1):
+    deTrend(df2, column = column, window = i, model = model, fitOrder = 1)
+    for j in range(maxFreq + 1):
+        deSeason(df2, column = column, freq = j, model = model)
+        if model == 'multiplicative':
+            RSS[i, j] = np.square((df2['{}_resid'.format(column)] - 1)).sum()
+        else:
+            RSS[i, j] = np.square(df2['{}_resid'.format(column)]).sum()
+
+fig, ax = plt.subplots(figsize=(10,10))
+plt.rcParams['font.weight'] = 'bold'
+plt.rcParams['font.size'] = 15
+plt.rcParams['xtick.labelsize'] = 15
+plt.rcParams['ytick.labelsize'] = 15
+
+plt.imshow(RSS[2:,:], cmap="jet", extent=[2, windowMaxSize, 0, maxFreq], aspect="auto")
+cbar = plt.colorbar()
+
+print df['Close_resid'][4:].head()
+
+y = df['Close_resid'][4:] - 1
+
+n = len(y) # length of the signal
+k = np.arange(n)
+T = n/Fs
+frq = k/T # two sides frequency range
+frq = frq[range(n/2)] # one side frequency range
+
+Y = np.fft.fft(y)/n # fft computing and normalization
+Y = Y[range(n/2)]
+
+fig, ax = plt.subplots(2, 1, figsize=(15,10))
+ax[0].plot(y)
+ax[0].set_xlabel('Time')
+ax[0].set_ylabel('Amplitude')
+ax[1].plot(frq, abs(Y),'r') # plotting the spectrum
+ax[1].set_xlabel('Freq (Hz)')
+ax[1].set_ylabel('|Y(freq)|')
