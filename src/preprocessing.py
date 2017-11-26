@@ -442,6 +442,8 @@ cbar = plt.colorbar()
 
 print df['Close_resid'][4:].head()
 
+Fs = 1.0;  # sampling rate
+Ts = 1.0/Fs; # sampling interval
 y = df['Close_resid'][4:] - 1
 
 n = len(y) # length of the signal
@@ -457,6 +459,6 @@ fig, ax = plt.subplots(2, 1, figsize=(15,10))
 ax[0].plot(y)
 ax[0].set_xlabel('Time')
 ax[0].set_ylabel('Amplitude')
-ax[1].plot(frq, abs(Y),'r') # plotting the spectrum
+ax[1].plot(frq,abs(Y),'r') # plotting the spectrum
 ax[1].set_xlabel('Freq (Hz)')
 ax[1].set_ylabel('|Y(freq)|')
