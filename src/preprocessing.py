@@ -63,9 +63,9 @@ def plot_returnSeries(df, asset, initialPlotDate = '', finalPlotDate = '', saveI
     ax[1].grid()
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/returns{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/returns{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
-def deTrend(df, column, window, model = 'additive', fitOrder = 1, plot = False, initialPlotDate = None, finalPlotDate = None):
+def deTrend(df, column, window, model = 'additive', fitOrder = 1, plot = False, initialPlotDate = None, finalPlotDate = None, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
     if window < fitOrder + 1:
         window = fitOrder +1
@@ -96,10 +96,12 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, plot = False, 
         plt.xlabel('Date')
         ax[0].set_title('Observed')
         ax[0].plot(df[column][initialPlotDate:finalPlotDate])
-        ax[1].set_title('Trend Predictions')
+        ax[1].set_title('Trend Predictions (n = {}, {} model)'.format(window, model))
         ax[1].plot(df[trendName][initialPlotDate:finalPlotDate])
         ax[2].set_title('Residuals ({} model)'.format(model))
         ax[2].plot(df[residName][initialPlotDate:finalPlotDate])
+        if saveImg:
+            fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/deTrend_result{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def deSeason(df, column, freq, model = 'additive', plot = False, initialPlotDate = None, finalPlotDate = None):
     model = 'multiplicative' if model.startswith('m') else 'additive'
@@ -184,7 +186,7 @@ def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5
         ax[3].grid()
 
         if saveImg:
-            fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/decompose{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+            fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/decompose{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def plot_deTrend_RSS(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
@@ -207,7 +209,7 @@ def plot_deTrend_RSS(df, column, model = 'additive', fitOrder = 1, windowMaxSize
             minIndex = i
     plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/deTrend_RSS{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/deTrend_RSS{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def plot_deSeason_RSS(df, column, model ='additive', maxFreq = 20, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
@@ -231,7 +233,7 @@ def plot_deSeason_RSS(df, column, model ='additive', maxFreq = 20, saveImg = Fal
             minIndex = i
     plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex, minValue), arrowprops=dict(facecolor='black', shrink=0.05))
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/deSeason_RSS{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/deSeason_RSS{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def plot_periodogram(df, column, numberOfLags = 30, initialLag = 0, yLog = False, saveImg = False, saveIndex = ''):
     if isnan(df[column].iloc[0]):
@@ -247,7 +249,7 @@ def plot_periodogram(df, column, numberOfLags = 30, initialLag = 0, yLog = False
     ax.stem(range(initialLag, length), pgram[initialLag:length])
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/periodogram{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/periodogram{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def plot_seasonalDecompose(df, asset, column, initialPlotDate = '', finalPlotDate = '', frequency = 1, saveImg = False, saveIndex = ''):
     if isnan(df[column].iloc[0]):
@@ -284,7 +286,7 @@ def plot_seasonalDecompose(df, asset, column, initialPlotDate = '', finalPlotDat
     ax[3].grid()
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/seasonal_decompose{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/seasonal_decompose{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def test_stationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg = False, saveIndex = ''):
     if isnan(ts.iloc[0]):
@@ -322,7 +324,7 @@ def test_stationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg 
     plt.figtext(0.1, -0.175, 'Critical Value (10%) {:39.6f}'.format(dfoutput['Critical Value (10%)']), size = 14)
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/test_stationarity{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/test_stationarity{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
     lag_acf = acf(df, nlags=lags)
@@ -348,14 +350,16 @@ def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
     plt.tight_layout()
 
     if saveImg:
-        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/acf_pacf{}.pdf'.format(asset, saveIndex), bbox_inches='tight')
+        fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/acf_pacf{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
 # </editor-fold>
 
-# <editor-fold> DATA INFO
+# <editor-fold> GLOBAL VARIABLES
 dataPath = '/home/danilofrp/projeto_final/data'
 assetType = 'stocks'
 asset = 'PETR4'
 frequency = 'diario'
+
+saveImgFormat = 'png'
 # </editor-fold>
 
 # <editor-fold> workspace
@@ -363,23 +367,23 @@ df = acquireData(dataPath, assetType, asset, frequency, replicateForHolidays = T
 
 plot_returnSeries(df, asset, initialPlotDate='2017-05', finalPlotDate='2017-05', saveImg = False, saveIndex = '1')
 
-deTrend(df, column = 'Close', window = 4, model = 'm', fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017')
+deTrend(df, column = 'Close', window = 20, model = 'a', fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017', saveImg = False, saveIndex = '10')
 
 deSeason(df, 'Close', freq = 5, model = 'm', plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
-plot_deTrend_RSS(df, 'Close', model = 'm', fitOrder = 1, windowMaxSize = 15)
+plot_deTrend_RSS(df, 'Close', model = 'a', fitOrder = 1, windowMaxSize = 15, saveImg = False, saveIndex = '')
 
 plot_deSeason_RSS(df, 'Close', model ='a', maxFreq = 100, saveImg = False, saveIndex = '')
 
 decompose(df, 'Close', model = 'a', window = 3, freq = 5, plot = True, initialPlotDate = '2008', finalPlotDate = '2008')
 
-plot_periodogram(df[20:], 'Close_resid', numberOfLags = 500, initialLag = 2, yLog = False, saveImg = False, saveIndex = '4')
+plot_periodogram(df[4:], 'Close_resid', numberOfLags = 2000, initialLag = 0, yLog = False, saveImg = False, saveIndex = '10')
 
 plot_seasonalDecompose(df, asset, 'Close', initialPlotDate='2016', finalPlotDate='2017', frequency=5, saveImg = False, saveIndex = '5')
 
 test_stationarity(df['Close_resid'][20:], window=20, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveIndex = '1')
 
-plot_acfAndPacf(df['Close_resid'][20:], lags = 60, saveImg = False, saveIndex = '1')
+plot_acfAndPacf(df['Close_resid'][20:], lags = 60, saveImg = False, saveIndex = '10')
 
 # </editor-fold>
 
@@ -392,7 +396,7 @@ ax.plot(df['Close_r']['2016-07':'2016-12'])
 ax.plot(results_ARIMA.fittedvalues['2016-07':'2016-12'], color='red')
 ax.axhline(y=0,linestyle='--',color='gray')
 ax.set_title('RSS: %.4f'% sum((results_ARIMA.fittedvalues['2016-07':'2016-12']-df['Close_r']['2016-07':'2016-12'])**2))
-#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/arima_fitted3.pdf'.format(asset), bbox_inches='tight')
+#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/arima_fitted3.{}'.format(asset, saveImgFormat), bbox_inches='tight')
 
 
 print(results_ARIMA.summary())
@@ -411,10 +415,28 @@ fig, ax = plt.subplots(figsize=(15,10), nrows = 1, ncols = 1, sharex = True)
 ax.plot(df['Close'][:'2016'])
 ax.plot(predictions_ARIMA[:'2016'])
 ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:'2016'])**2)/len(df['Close'][:'2016'])))
-#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/close_fitted1.pdf'.format(asset), bbox_inches='tight')
+#fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/{}/close_fitted1.{}'.format(asset, saveImgFormat), bbox_inches='tight')
 
 # </editor-fold>
 
+offset = 101
+window = 4
+x = range(0, window)
+y = df['Close'][offset : offset + window].values
+a = np.polyfit(x, y, 1)
+fit = [0.0 for i in range(window)]
+prediction = 0
+for j in range(1, -1, -1):
+    prediction += a[1 - j]*(window**j)
+for i in range(window):
+    fit[i] = a[1] + a[0]*x[i]
+fig, ax = plt.subplots(1, 1, figsize=(10,10))
+ax.plot(x, y, 'bo', label="data")
+ax.plot(x, fit, 'g', label="fitted")
+ax.plot(window, prediction, 'ro', label="predicted")
+ax.plot(window, df['Close'][offset + window], 'bo')
+plt.legend()
+fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/slides/trend_fit.{}'.format(saveImgFormat), bbox_inches='tight')
 
 df2 = df.copy()
 windowMaxSize = 15
@@ -444,7 +466,7 @@ print df['Close_resid'][4:].head()
 
 Fs = 1.0;  # sampling rate
 Ts = 1.0/Fs; # sampling interval
-y = df['Close_resid'][4:] - 1
+y = df['Close_resid'][4:] -1
 
 n = len(y) # length of the signal
 k = np.arange(n)
@@ -459,6 +481,7 @@ fig, ax = plt.subplots(2, 1, figsize=(15,10))
 ax[0].plot(y)
 ax[0].set_xlabel('Time')
 ax[0].set_ylabel('Amplitude')
-ax[1].plot(frq,abs(Y),'r') # plotting the spectrum
-ax[1].set_xlabel('Freq (Hz)')
-ax[1].set_ylabel('|Y(freq)|')
+ax[1].plot(frq,abs(Y), 'r') # plotting the spectrum
+ax[1].set_xlabel('Freq (1/day)')
+ax[1].set_ylabel('|X(freq)|')
+fig.savefig('/home/danilofrp/projeto_final/results/preprocessing/slides/fft_resid.{}'.format(saveImgFormat), bbox_inches='tight')
