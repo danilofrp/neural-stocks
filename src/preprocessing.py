@@ -42,7 +42,7 @@ def acquireData(replicateForHolidays = False):
 
     df['Close_r'] = np.log(df.Close/df.Close.shift(1))
 
-    return df.drop(df.index[0])
+    return df
 
 def plot_Series(df, column, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveIndex = ''):
     initialPlotDate = initialPlotDate if initialPlotDate else df.index[0].strftime('%d-%m-%Y')
@@ -111,9 +111,10 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, plot = False, 
         plt.xlabel('Date')
         ax[0].set_title('Observed')
         ax[0].plot(df[column][initialPlotDate:finalPlotDate])
-        ax[1].set_title('Trend Predictions (n = {}, {} model)'.format(window, model))
+        ax[1].set_title('Trend Estimation (n = {}, {} model)'.format(window, model))
         ax[1].plot(df[trendName][initialPlotDate:finalPlotDate])
-        ax[2].set_title('Residuals ({} model)'.format(model))
+        signal = '/' if model.startswith('m') else '-'
+        ax[2].set_title('Observed {} Trend ({} model)'.format(signal, model))
         ax[2].plot(df[residName][initialPlotDate:finalPlotDate])
         if saveImg:
             fig.savefig('{}/deTrend_result{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
@@ -202,73 +203,70 @@ def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5
         if saveImg:
             fig.savefig('{}/decompose{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
 
-def plot_deTrend_RSS(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, saveImg = False, saveIndex = ''):
+def plot_deTrend_RMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
     df2 = df.copy()
-    RSS = np.empty(windowMaxSize + 1)*np.nan
+    RMSE = np.empty(windowMaxSize + 1)*np.nan
     for i in range(fitOrder + 1, windowMaxSize + 1):
         deTrend(df2, column = column, window = i, model = model, fitOrder = fitOrder)
         if model == 'multiplicative':
-            RSS[i] = np.square((df2['{}_resid'.format(column)] - 1)).sum() # subtrair a média
+            RMSE[i] = (np.square((df2['{}_resid'.format(column)] - 1)).sum())/(len(df2) - i) # subtrair a média
         else:
-            RSS[i] = np.square(df2['{}_resid'.format(column)]).sum()
+            RMSE[i] = (np.square(df2['{}_resid'.format(column)]).sum())/(len(df2) - i)
     fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
-    ax.set_title('RSS for each deTrend window size ({} model)'.format(model))
+    ax.set_title('DeTrend RMSE per window size ({} model)'.format(model), fontsize = 20, fontweight = 'bold')
     ax.set_xlabel('Window size')
-    ax.set_ylabel('RSS')
-    ax.plot(range(0,windowMaxSize+1), RSS, 'bo')
-    minValue = min(RSS[fitOrder + 1 : windowMaxSize + 1])
+    ax.set_ylabel('RMSE')
+    ax.plot(range(0,windowMaxSize+1), RMSE, 'bo')
+    minValue = min(RMSE[fitOrder + 1 : windowMaxSize + 1])
     for i in range(fitOrder + 1, windowMaxSize + 1):
-        if RSS[i] == minValue:
+        if RMSE[i] == minValue:
             minIndex = i
     plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
     if saveImg:
-        fig.savefig('{}/deTrend_RSS{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+        fig.savefig('{}/deTrend_RMSE{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
 
-def plot_deSeason_RSS(df, column, model ='additive', maxFreq = 20, saveImg = False, saveIndex = ''):
+def plot_deSeason_RMSE(df, column, model ='additive', maxFreq = 20, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
     df2 = df.copy()
-    RSS = np.empty(maxFreq + 1)*np.nan
+    nanSamples = 0
+    for i in range(len(df2)):
+        if not np.isnan(df2['{}_resid'.format(column)].iloc[i]):
+            nanSamples = i
+            break
+    RMSE = np.empty(maxFreq + 1)*np.nan
     for i in range(0, maxFreq + 1):
         deSeason(df2, column = column, freq = i, model = model)
         if model == 'multiplicative':
-            RSS[i] = np.square((df2['{}_resid'.format(column)] - 1)).sum()
+            RMSE[i] = (np.square((df2['{}_resid'.format(column)] - 1)).sum())/(len(df2) - nanSamples)
         else:
-            RSS[i] = np.square(df2['{}_resid'.format(column)]).sum()
+            RMSE[i] = (np.square(df2['{}_resid'.format(column)]).sum())/(len(df2) - nanSamples)
     fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
-    ax.set_title('RSS for each deSeason frequency ({} model)'.format(model))
-    ax.set_xlabel('Frequency (days)')
-    ax.set_ylabel('RSS')
+    ax.set_title('DeSeason RMSE per assumed period ({} model)'.format(model))
+    ax.set_xlabel('Period (samples)')
+    ax.set_ylabel('RMSE')
 
-    ax.plot(range(0,maxFreq+1), RSS, 'bo')
-    minValue = min(RSS[0 : maxFreq + 1])
+    ax.plot(range(0,maxFreq+1), RMSE, 'bo')
+    minValue = min(RMSE[0 : maxFreq + 1])
     for i in range(0, maxFreq + 1):
-        if RSS[i] == minValue:
+        if RMSE[i] == minValue:
             minIndex = i
     plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex, minValue), arrowprops=dict(facecolor='black', shrink=0.05))
     if saveImg:
-        fig.savefig('{}/deSeason_RSS{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+        fig.savefig('{}/deSeason_RMSE{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
 
 def plot_periodogram(df, column, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveIndex = ''):
     if isnan(df[column].iloc[0]):
         df = df.drop(df.index[0])
     pgram = periodogram(df[column])
     plotEnd = plotEnd if plotEnd else len(df)/2
-    Fs = 1.0;  # sampling rate
-    Ts = 1.0/Fs; # sampling interval
-    n = len(df) # length of the signal
-    k = np.arange(n)
-    T = n/Fs
-    frq = k/T # two sides frequency range
-    frq = frq[range(n/2)]
 
     fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1, sharex = True)
-    ax.set_xlabel('Frequency (1/sample)')
-    ax.set_title('Periodogram')
+    fig.suptitle('Periodogram')
+    ax.set_xlabel('Period (samples)')
     if yLog:
         plt.yscale('log')
-    ax.stem(frq[plotInit:plotEnd], pgram[plotInit:plotEnd])
-
+    ax.stem(range(plotInit, plotEnd+1), pgram[plotInit:plotEnd+1])
     if saveImg:
         fig.savefig('{}/periodogram{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
 
@@ -351,27 +349,25 @@ def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
     lag_acf = acf(df, nlags=lags)
     lag_pacf = pacf(df, nlags=lags, method='ols')
 
-    fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 2)
-    #print 'acf: {}, {}, {}, {}, {}, {}'.format(lag_acf[0], lag_acf[1], lag_acf[2], lag_acf[3], lag_acf[4], lag_acf[5], )
-    #print 'pacf: {}, {}, {}, {}, {}, {}'.format(lag_pacf[0], lag_pacf[1], lag_pacf[2], lag_pacf[3], lag_pacf[4], lag_pacf[5], )
-
+    fig, ax = plt.subplots(figsize=(20,10), nrows = 1, ncols = 2)
     #Plot ACF:
+    ax[0].set_title('Autocorrelation Function')
+    ax[0].set_xlabel('Lags')
     ax[0].stem(lag_acf)
     ax[0].axhline(y=0,linestyle='--',color='gray')
     ax[0].axhline(y=-7.96/np.sqrt(len(df)),linestyle='--',color='gray')
     ax[0].axhline(y=7.96/np.sqrt(len(df)),linestyle='--',color='gray')
-    ax[0].set_title('Autocorrelation Function')
-
     #Plot PACF:
+    ax[1].set_title('Partial Autocorrelation Function')
+    ax[1].set_xlabel('Lags')
     ax[1].stem(lag_pacf)
     ax[1].axhline(y=0,linestyle='--',color='gray')
     ax[1].axhline(y=-7.96/np.sqrt(len(df)),linestyle='--',color='gray')
     ax[1].axhline(y=7.96/np.sqrt(len(df)),linestyle='--',color='gray')
-    ax[1].set_title('Partial Autocorrelation Function')
-    plt.tight_layout()
 
     if saveImg:
-        fig.savefig('{}/acf_pacf{}.{}'.format(asset, saveIndex, saveImgFormat), bbox_inches='tight')
+        fig.savefig('{}/acf_pacf{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+
 # </editor-fold>
 
 # <editor-fold> GLOBAL PARAMS
@@ -389,6 +385,7 @@ plt.rcParams['font.weight'] = 'bold'
 plt.rcParams['figure.titlesize'] = 18
 plt.rcParams['figure.titleweight'] = 'bold'
 plt.rcParams['axes.titlesize'] = 15
+plt.rcParams['axes.titleweight'] = 'bold'
 plt.rcParams['axes.labelsize'] = 15
 plt.rcParams['axes.labelweight'] = 'bold'
 plt.rcParams['xtick.labelsize'] = 13
@@ -402,23 +399,23 @@ plot_Series(df, column = 'Close', initialPlotDate = '', finalPlotDate = '', save
 
 plot_returnSeries(df, initialPlotDate='2017-05', finalPlotDate='2017-05', saveImg = False, saveIndex = '1')
 
-deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017', saveImg = False, saveIndex = '10')
+deTrend(df, column = 'Close', window = 20, model = decomposeModel, fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017', saveImg = False, saveIndex = '_a20')
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
-plot_deTrend_RSS(df, column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 15, saveImg = False, saveIndex = '')
+plot_deTrend_RMSE(df, column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 15, saveImg = False, saveIndex = '')
 
-plot_deSeason_RSS(df, column = 'Close', model = decomposeModel, maxFreq = 300, saveImg = False, saveIndex = '')
+plot_deSeason_RMSE(df, column = 'Close', model = decomposeModel, maxFreq = 300, saveImg = False, saveIndex = '')
 
-decompose(df, column = 'Close', model = decomposeModel, window = 3, freq = 5, plot = True, initialPlotDate = '2008', finalPlotDate = '2008')
+decompose(df, column = 'Close', model = decomposeModel, window = 3, freq = 5, plot = False, initialPlotDate = '2008', finalPlotDate = '2008')
 
-plot_periodogram(df[4:], column = 'Close_resid', plotInit = 0, plotEnd = '', yLog = False, saveImg = False, saveIndex = '10')
+plot_periodogram(df[20:], column = 'Close_resid', plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveIndex = '_resid_a20')
 
 plot_seasonalDecompose(df, column = 'Close', initialPlotDate='2016', finalPlotDate='2017', frequency=5, saveImg = False, saveIndex = '5')
 
 test_stationarity(df['Close_resid'][20:], window=20, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveIndex = '1')
 
-plot_acfAndPacf(df['Close_resid'][20:], lags = 60, saveImg = False, saveIndex = '10')
+plot_acfAndPacf(df['Close_resid'][20:], lags = 60, saveImg = False, saveIndex = '_a20')
 
 # </editor-fold>
 
@@ -466,6 +463,7 @@ for j in range(1, -1, -1):
 for i in range(window):
     fit[i] = a[1] + a[0]*x[i]
 fig, ax = plt.subplots(1, 1, figsize=(10,10))
+ax.set_title('Prediction Method', fontsize = 20, fontweight = 'bold')
 ax.plot(x, y, 'bo', label="data")
 ax.plot(x, fit, 'g', label="fitted")
 ax.plot(window, prediction, 'ro', label="predicted")
@@ -497,7 +495,7 @@ print df['Close_resid'][4:].head()
 
 Fs = 1.0;  # sampling rate
 Ts = 1.0/Fs; # sampling interval
-y = df['Close_resid'][4:]
+y = df['Close_resid'][20:]
 
 n = len(y) # length of the signal
 k = np.arange(n)
@@ -513,6 +511,6 @@ ax[0].plot(y)
 ax[0].set_xlabel('Time')
 ax[0].set_ylabel('Amplitude')
 ax[1].plot(frq,abs(Y), 'r') # plotting the spectrum
-ax[1].set_xlabel('Freq (1/day)')
+ax[1].set_xlabel('Freq (1/sample)')
 ax[1].set_ylabel('|X(freq)|')
-fig.savefig('{}fft_resid.{}'.format(saveImgFolder, saveImgFormat), bbox_inches='tight')
+fig.savefig('{}/fft_resid_a20.{}'.format(saveImgFolder, saveImgFormat), bbox_inches='tight')
