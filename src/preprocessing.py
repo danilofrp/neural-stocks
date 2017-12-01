@@ -1,4 +1,6 @@
 # <editor-fold> IMPORTS
+import sys
+sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,6 +10,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.arima_model import ARIMA, ARIMAResults
 from statsmodels.tsa.stattools import periodogram, adfuller, acf, pacf
 from math import isnan
+from pyTaLib.indicators import *
 %matplotlib inline
 # </editor-fold>
 
@@ -514,3 +517,26 @@ ax[1].plot(frq,abs(Y), 'r') # plotting the spectrum
 ax[1].set_xlabel('Freq (1/sample)')
 ax[1].set_ylabel('|X(freq)|')
 fig.savefig('{}/fft_resid_a20.{}'.format(saveImgFolder, saveImgFormat), bbox_inches='tight')
+
+
+from pyTaLib.indicators import EMA, MACD
+
+fig, ax = plt.subplots(2, 1, figsize=(10,10))
+ax[0].plot(df['Close']['2017'])
+macd = MACD(df)
+ax[1].plot(macd['MACD_12_26']['2017'], 'g')
+ax[1].plot(macd['MACDsignal_12_26']['2017'], 'r')
+
+EMA(df, 'Close', 17)
+MACD(df)
+
+def MACD2(df, n_fast = 12, n_slow = 26, n_signal = 9):
+    EMAfast = Series(pd.Series.ewm(df['Close'], span = n_fast, min_periods = n_slow - 1).mean())
+    EMAslow = Series(pd.Series.ewm(df['Close'], span = n_slow, min_periods = n_slow - 1).mean())
+    MACD = Series(EMAfast - EMAslow, name = 'MACD_' + str(n_fast) + '_' + str(n_slow))
+    MACDsign = Series(pd.Series.ewm(MACD, span = n_signal, min_periods = n_signal - 1).mean(), name = 'MACDsignal_' + str(n_fast) + '_' + str(n_slow))
+    MACDdiff = Series(MACD - MACDsign, name = 'MACDdiff_' + str(n_fast) + '_' + str(n_slow))
+    macd = concat(objs=[MACD, MACDsign, MACDdiff], axis = 1)
+    return macd
+
+MACD2(df)

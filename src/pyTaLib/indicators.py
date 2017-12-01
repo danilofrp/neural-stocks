@@ -8,7 +8,7 @@ def SMA(df, column, n):
 
 #Exponential Moving Average
 def EMA(df, column, n):
-    return Series(ewma(df[column], span = n, min_periods = n - 1), name = column + '_EMA_' + str(n))
+    return Series(Series.ewm(df[column], span = n, min_periods = n - 1).mean(), name = column + '_EMA_' + str(n))
 
 #Momentum
 def MOM(df, column, n):
@@ -32,7 +32,7 @@ def ATR(df, n):
         TR_l.append(TR)
         i = i + 1
     TR_s = Series(TR_l)
-    ATR = Series(ewma(TR_s, span = n, min_periods = n), index = index, name = 'ATR_' + str(n))
+    ATR = Series(Series.ewm(TR_s, span = n, min_periods = n).mean(), index = index, name = 'ATR_' + str(n))
     return ATR
 
 #Bollinger Bands
@@ -44,7 +44,7 @@ def BBANDS(df, n = 20):
     B1 = Series(b1, name = 'BollingerBW_' + str(n))
     b2 = (df['Close'] - (MA - 2 * MSD)) / (4 * MSD)
     B2 = Series(b2, name = 'Bollinger%b_' + str(n))
-    BB = concat(BMA, B1, B2)
+    BB = concat([BMA, B1, B2], axis = 1)
     return BB
 
 #Pivot Points, Supports and Resistances
@@ -67,16 +67,16 @@ def STOK(df):
 #Stochastic oscillator %D
 def STOD(df, n):
     SOk = Series((df['Close'] - df['Low']) / (df['High'] - df['Low']), name = 'SO%k')
-    SOd = Series(ewma(SOk, span = n, min_periods = n - 1), name = 'SO%d_' + str(n))
+    SOd = Series(Series.ewm(SOk, span = n, min_periods = n - 1).mean(), name = 'SO%d_' + str(n))
     return SOd
 
 #Trix
 def TRIX(df, n):
     index = df.index.values
     df.reset_index()
-    EX1 = ewma(df['Close'], span = n, min_periods = n - 1)
-    EX2 = ewma(EX1, span = n, min_periods = n - 1)
-    EX3 = ewma(EX2, span = n, min_periods = n - 1)
+    EX1 = Series.ewm(df['Close'], span = n, min_periods = n - 1).mean()
+    EX2 = Series.ewm(EX1, span = n, min_periods = n - 1).mean()
+    EX3 = Series.ewm(EX2, span = n, min_periods = n - 1).mean()
     i = 0
     ROC_l = [0]
     while i + 1 <= df.index[-1]:
@@ -112,29 +112,29 @@ def ADX(df, n, n_ADX):
         TR_l.append(TR)
         i = i + 1
     TR_s = Series(TR_l)
-    ATR = Series(ewma(TR_s, span = n, min_periods = n))
+    ATR = Series(Series.ewm(TR_s, span = n, min_periods = n).mean())
     UpI = Series(UpI)
     DoI = Series(DoI)
-    PosDI = Series(ewma(UpI, span = n, min_periods = n - 1) / ATR)
-    NegDI = Series(ewma(DoI, span = n, min_periods = n - 1) / ATR)
-    ADX = Series(ewma(abs(PosDI - NegDI) / (PosDI + NegDI), span = n_ADX, min_periods = n_ADX - 1), index = index, name = 'ADX_' + str(n) + '_' + str(n_ADX))
+    PosDI = Series(Series.ewm(UpI, span = n, min_periods = n - 1).mean() / ATR)
+    NegDI = Series(Series.ewm(DoI, span = n, min_periods = n - 1).mean() / ATR)
+    ADX = Series(Series.ewm(abs(PosDI - NegDI) / (PosDI + NegDI), span = n_ADX, min_periods = n_ADX - 1).mean(), index = index, name = 'ADX_' + str(n) + '_' + str(n_ADX))
     return ADX
 
 #MACD, MACD Signal and MACD difference
 def MACD(df, n_fast = 12, n_slow = 26, n_signal = 9):
-    EMAfast = Series(ewma(df['Close'], span = n_fast, min_periods = n_slow - 1))
-    EMAslow = Series(ewma(df['Close'], span = n_slow, min_periods = n_slow - 1))
+    EMAfast = Series(Series.ewm(df['Close'], span = n_fast, min_periods = n_slow - 1).mean())
+    EMAslow = Series(Series.ewm(df['Close'], span = n_slow, min_periods = n_slow - 1).mean())
     MACD = Series(EMAfast - EMAslow, name = 'MACD_' + str(n_fast) + '_' + str(n_slow))
-    MACDsign = Series(ewma(MACD, span = n_signal, min_periods = n_signal - 1), name = 'MACDsignal_' + str(n_fast) + '_' + str(n_slow))
+    MACDsign = Series(Series.ewm(MACD, span = n_signal, min_periods = n_signal - 1).mean(), name = 'MACDsignal_' + str(n_fast) + '_' + str(n_slow))
     MACDdiff = Series(MACD - MACDsign, name = 'MACDdiff_' + str(n_fast) + '_' + str(n_slow))
-    macd = concat(MACD, MACDsign, MACDdiff)
+    macd = pandas.concat([MACD, MACDsign, MACDdiff], axis = 1)
     return macd
 
 #Mass Index
 def MassI(df):
     Range = df['High'] - df['Low']
-    EX1 = ewma(Range, span = 9, min_periods = 8)
-    EX2 = ewma(EX1, span = 9, min_periods = 8)
+    EX1 = Series.ewm(Range, span = 9, min_periods = 8).mean()
+    EX2 = Series.ewm(EX1, span = 9, min_periods = 8).mean()
     Mass = EX1 / EX2
     MassI = Series(rolling_sum(Mass, 25), name = 'Mass Index')
     return MassI
@@ -196,8 +196,8 @@ def RSI(df, n):
         i = i + 1
     UpI = Series(UpI)
     DoI = Series(DoI)
-    PosDI = Series(ewma(UpI, span = n, min_periods = n - 1))
-    NegDI = Series(ewma(DoI, span = n, min_periods = n - 1))
+    PosDI = Series(Series.ewm(UpI, span = n, min_periods = n - 1).mean())
+    NegDI = Series(Series.ewm(DoI, span = n, min_periods = n - 1).mean())
     RSI = Series(PosDI / (PosDI + NegDI), index = index, name = 'RSI_' + str(n))
     return RSI
 
@@ -205,10 +205,10 @@ def RSI(df, n):
 def TSI(df, r, s):
     M = Series(df['Close'].diff(1))
     aM = abs(M)
-    EMA1 = Series(ewma(M, span = r, min_periods = r - 1))
-    aEMA1 = Series(ewma(aM, span = r, min_periods = r - 1))
-    EMA2 = Series(ewma(EMA1, span = s, min_periods = s - 1))
-    aEMA2 = Series(ewma(aEMA1, span = s, min_periods = s - 1))
+    EMA1 = Series(Series.ewm(M, span = r, min_periods = r - 1).mean())
+    aEMA1 = Series(Series.ewm(aM, span = r, min_periods = r - 1).mean())
+    EMA2 = Series(Series.ewm(EMA1, span = s, min_periods = s - 1).mean())
+    aEMA2 = Series(Series.ewm(aEMA1, span = s, min_periods = s - 1).mean())
     TSI = Series(EMA2 / aEMA2, name = 'TSI_' + str(r) + '_' + str(s))
     return TSI
 
@@ -224,7 +224,7 @@ def ACCDIST(df, n):
 #Chaikin Oscillator
 def Chaikin(df):
     ad = (2 * df['Close'] - df['High'] - df['Low']) / (df['High'] - df['Low']) * df['Volume']
-    Chaikin = Series(ewma(ad, span = 3, min_periods = 2) - ewma(ad, span = 10, min_periods = 9), name = 'Chaikin')
+    Chaikin = Series(Series.ewm(ad, span = 3, min_periods = 2).mean() - Series.ewm(ad, span = 10, min_periods = 9).mean(), name = 'Chaikin')
     return Chaikin
 
 #Money Flow Index and Ratio
@@ -288,7 +288,7 @@ def COPP(df, n):
     M = df['Close'].diff(int(n * 14 / 10) - 1)
     N = df['Close'].shift(int(n * 14 / 10) - 1)
     ROC2 = M / N
-    Copp = Series(ewma(ROC1 + ROC2, span = n, min_periods = n), name = 'Copp_' + str(n))
+    Copp = Series(Series.ewm(ROC1 + ROC2, span = n, min_periods = n).mean(), name = 'Copp_' + str(n))
     return Copp
 
 #Keltner Channel
@@ -296,7 +296,7 @@ def KELCH(df, n):
     KelChM = Series(rolling_mean((df['High'] + df['Low'] + df['Close']) / 3, n), name = 'KelChM_' + str(n))
     KelChU = Series(rolling_mean((4 * df['High'] - 2 * df['Low'] + df['Close']) / 3, n), name = 'KelChU_' + str(n))
     KelChD = Series(rolling_mean((-2 * df['High'] + 4 * df['Low'] + df['Close']) / 3, n), name = 'KelChD_' + str(n))
-    KelCh = concat(KelChM, KelChU, KelChD)
+    KelCh = concat([KelChM, KelChU, KelChD], axis = 1)
     return KelCh
 
 #Ultimate Oscillator
@@ -335,4 +335,4 @@ def DONCH(df, n):
 
 #Standard Deviation
 def STDDEV(df, column, n):
-    return Series(rolling_std(df[column], n), name = column + '_STD_' + str(n)))
+    return Series(rolling_std(df[column], n), name = column + '_STD_' + str(n))
