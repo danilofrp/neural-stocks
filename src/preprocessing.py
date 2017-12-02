@@ -16,10 +16,11 @@ from pyTaLib.indicators import *
 
 # <editor-fold> FUNCTIONS DEF
 def insertMissingDays(df):
-    start = datetime(2000, 3, 1)
-    end = datetime(2017, 9, 1)
+    start = df.index[0]
+    end = df.index[-1]
     step = timedelta(days=1)
 
+    df.loc[:,'Holiday'] = 0
     while start <= end:
         if start.weekday() < 5: # 5 - Saturday, 6 - Sunday
             if not (start in df.index):
@@ -32,18 +33,110 @@ def insertMissingDays(df):
 
     return df
 
-def acquireData(replicateForHolidays = False):
-    filepath = dataPath + '/' + assetType + '/' + asset + '/' + frequency + '/' + asset + '.CSV'
+def logReturns(s1, s2 = pd.Series([])):
+    """Log Returns of time series
+    Parameters
+    ----------
+    s1, s2 : pandas.Series objects
+             if s2 is not defined, calculates log
+             returns between actual and
+             previous samples of s1
 
+    Returns
+    ----------
+    log_returns : pandas.Series
+    """
+    columnName = s1.name + '_returns' if (s2.empty or s1.name == s2.name) else s1.name + '/' + s2.name + '_returns'
+    if s2.empty:
+        return pd.Series(np.log(s1/s1.shift()), name = columnName)
+    else:
+        return pd.Series(np.log(s1/s2), name = columnName)
+
+def calculateSMAs(df, column, lenghts):
+    """Simple Moving Averages calculation
+    Parameters
+    ----------
+    df : pandas.DataFrame object
+    column : string, column from which to calculate Moving Averages
+    lenghts : int array, set of desired lenghts to calculate moving averages
+
+    Returns
+    ----------
+    df : pandas.DataFrame, original DataFrame concatenated with moving
+        averages and log differences between column moving averages
+    """
+    for l in lenghts:
+        sma = SMA(df, column, l)
+        df = pd.concat([df, sma], axis = 1)
+        df = pd.concat([df, pd.Series(logReturns(df[column], sma), name='{}_SMA{}_logdiff'.format(column, l))], axis = 1)
+    return df
+
+def calculateEMAs(df, column, lenghts):
+    """Exponential Moving Averages calculation
+    Parameters
+    ----------
+    df : pandas.DataFrame object
+    column : string, column from which to calculate Moving Averages
+    lenghts : int array, set of desired lenghts to calculate moving averages
+
+    Returns
+    ----------
+    df : pandas.DataFrame, original DataFrame concatenated with moving
+        averages and log differences between column and moving averages
+    """
+    for l in lenghts:
+        ema = EMA(df, column, l)
+        df = pd.concat([df, ema], axis = 1)
+        df = pd.concat([df, pd.Series(logReturns(df[column], ema), name='{}_EMA{}_logdiff'.format(column, l))], axis = 1)
+    return df
+
+def acquireData(replicateForHolidays = False, returnCalcParams = [], SMAcols = [], SMAparams = [], EMAcols = [], EMAparams = []):
+    """Data Acquisition
+    Parameters
+    ----------
+    replicateForHolidays : bool, indicates wheter or not to insert holidays in the
+        series, replicating the last value. Every missing day that is not weekend
+        is considered to be a holiday. Default False
+
+    returnCalcParams : array-like, array containing one or two-sized string arrays,
+        refering to the columns used to calculate returns. If the array contains a
+        single column, calculates log returns between actual and previos samples.
+        If the array specifies 2 columns, calculates log return between corresponding
+        samples of both columns. Default empty
+
+    SMAcols, EMAcols : string array, set of desired columns to calculate moving averages
+        from. If either SMA or EMA are specified, its corresponding params must be
+        specified. Default empty
+
+    SMAparams, EMAparams : int array, set of lenghts to calculate SMA and EMA and its
+        corresponding log differences from epecified column. Default empty
+
+    Returns
+    ----------
+    df : pandas.DataFrame, DataFrame containing original data and any aditional
+        calculations specified in function params
+    """
+    filepath = dataPath + '/' + assetType + '/' + asset + '/' + frequency + '/' + asset + '.CSV'
     df = pd.read_csv(filepath, delimiter=';', decimal=',',
                      parse_dates=['Date'], dayfirst=True, index_col='Date')
     df = df.sort_index() #csv entries begin from most recent to older dates
 
     if replicateForHolidays:
-        df.loc[:,'Holiday'] = 0
         df = insertMissingDays(df)
 
-    df['Close_r'] = np.log(df.Close/df.Close.shift(1))
+    for cols in returnCalcParams:
+        if len(cols) == 1:
+            df = pd.concat([df, logReturns(df[cols[0]])], axis=1)
+        elif len(cols) == 2:
+            df = pd.concat([df, logReturns(df[cols[0]], df[cols[1]])], axis=1)
+
+    if len(SMAcols) > 0 and len(SMAparams) > 0:
+        for col in SMAcols:
+            df = calculateSMAs(df, col, SMAparams)
+
+    if len(EMAcols) > 0 and len(EMAparams) > 0:
+        for col in EMAcols:
+            df = calculateEMAs(df, col, EMAparams)
 
     return df
 
@@ -371,15 +464,49 @@ def plot_acfAndPacf(df, lags = 10, saveImg = False, saveIndex = ''):
     if saveImg:
         fig.savefig('{}/acf_pacf{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
 
+def crosscorr(x, y, nlags = 0):
+    """Cross correlations calculatins until nlags.
+    Parameters
+    ----------
+    nlags : int, number of lags to calculate cross-correlation, default 0
+    x, y : pandas.Series objects of equal length
+
+    Returns
+    ----------
+    crosscorr : [float]
+    """
+    return [x.corr(y.shift(lag)) for lag in range(nlags + 1)]
+
+def plot_crosscorr(x, y, nlags = 10, saveImg = False, saveIndex = 0):
+    """Cross correlations calculatins until nlags.
+    Parameters
+    ----------
+    x, y : pandas.Series objects of equal length
+    nlags : int, number of lags to calculate cross-correlation, default 10
+    saveImg : bool, saves image to save directory if True, default False
+    saveIndex: string, sufix to add to saved image file name, default empty
+    """
+    crossCorrelation = crosscorr(x, y, nlags)
+
+    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1)
+    #Plot ACF:
+    ax.set_title('Crosscorrelation ({} and {})'.format(x.name, y.name))
+    ax.set_xlabel('Lags')
+    ax.stem(crossCorrelation)
+    ax.axhline(y=0,linestyle='--',color='gray')
+    ax.axhline(y=-7.96/np.sqrt(max(len(x), len(y))),linestyle='--',color='gray')
+    ax.axhline(y=7.96/np.sqrt(max(len(x), len(y))),linestyle='--',color='gray')
+    if saveImg:
+        fig.savefig('{}/crosscorr_{}_{}_{}.{}'.format(saveImgFolder, x.name, y.name,  saveIndex, saveImgFormat), bbox_inches='tight')
 # </editor-fold>
 
 # <editor-fold> GLOBAL PARAMS
 dataPath = '/home/danilofrp/projeto_final/data'
 assetType = 'stocks'
-asset = 'PETR4'
+asset = 'ITUB4'
 frequency = 'diario'
 
-decomposeModel = 'additive'
+decomposeModel = 'multiplicative'
 
 saveImgFolder = '/home/danilofrp/projeto_final/results/preprocessing/slides'
 saveImgFormat = 'png'
@@ -396,13 +523,14 @@ plt.rcParams['ytick.labelsize'] = 13
 # </editor-fold>
 
 # <editor-fold> workspace
-df = acquireData(replicateForHolidays = True)
+df = acquireData(replicateForHolidays = True, returnCalcParams = [['Close'], ['Close', 'Open']], EMAcols = ['Close'], EMAparams = [17, 72])
+df.head(10)
 
 plot_Series(df, column = 'Close', initialPlotDate = '', finalPlotDate = '', saveImg = False, saveIndex = '')
 
-plot_returnSeries(df, initialPlotDate='2017-05', finalPlotDate='2017-05', saveImg = False, saveIndex = '1')
+plot_returnSeries(df, column = 'Close', initialPlotDate='2017', finalPlotDate='2017', saveImg = False, saveIndex = '1')
 
-deTrend(df, column = 'Close', window = 20, model = decomposeModel, fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017', saveImg = False, saveIndex = '_a20')
+deTrend(df, column = 'Close', window = 4, model = decomposeModel, fitOrder = 1, plot = True, initialPlotDate = '2000', finalPlotDate = '2017', saveImg = False, saveIndex = '_a20')
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
@@ -419,6 +547,8 @@ plot_seasonalDecompose(df, column = 'Close', initialPlotDate='2016', finalPlotDa
 test_stationarity(df['Close_resid'][20:], window=20, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveIndex = '1')
 
 plot_acfAndPacf(df['Close_resid'][20:], lags = 60, saveImg = False, saveIndex = '_a20')
+
+plot_crosscorr(df['Close_resid'], df['Close_EMA17_logdiff'], 50)
 
 # </editor-fold>
 
@@ -454,26 +584,6 @@ ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:
 
 # </editor-fold>
 
-offset = 101
-window = 4
-x = range(0, window)
-y = df['Close'][offset : offset + window].values
-a = np.polyfit(x, y, 1)
-fit = [0.0 for i in range(window)]
-prediction = 0
-for j in range(1, -1, -1):
-    prediction += a[1 - j]*(window**j)
-for i in range(window):
-    fit[i] = a[1] + a[0]*x[i]
-fig, ax = plt.subplots(1, 1, figsize=(10,10))
-ax.set_title('Prediction Method', fontsize = 20, fontweight = 'bold')
-ax.plot(x, y, 'bo', label="data")
-ax.plot(x, fit, 'g', label="fitted")
-ax.plot(window, prediction, 'ro', label="predicted")
-ax.plot(window, df['Close'][offset + window], 'bo')
-plt.legend()
-fig.savefig('{}/trend_fit.{}'.format(saveImgFolder, saveImgFormat), bbox_inches='tight')
-
 df2 = df.copy()
 windowMaxSize = 20
 maxFreq = 30
@@ -498,7 +608,7 @@ print df['Close_resid'][4:].head()
 
 Fs = 1.0;  # sampling rate
 Ts = 1.0/Fs; # sampling interval
-y = df['Close_resid'][20:]
+y = df['Close_resid'][20:] -1
 
 n = len(y) # length of the signal
 k = np.arange(n)
@@ -518,25 +628,31 @@ ax[1].set_xlabel('Freq (1/sample)')
 ax[1].set_ylabel('|X(freq)|')
 fig.savefig('{}/fft_resid_a20.{}'.format(saveImgFolder, saveImgFormat), bbox_inches='tight')
 
-
-from pyTaLib.indicators import EMA, MACD
-
 fig, ax = plt.subplots(2, 1, figsize=(10,10))
 ax[0].plot(df['Close']['2017'])
+ax[0].plot(EMA(df['2017'], 'Close', 17), 'r')
 macd = MACD(df)
 ax[1].plot(macd['MACD_12_26']['2017'], 'g')
 ax[1].plot(macd['MACDsignal_12_26']['2017'], 'r')
 
-EMA(df, 'Close', 17)
-MACD(df)
-
-def MACD2(df, n_fast = 12, n_slow = 26, n_signal = 9):
-    EMAfast = Series(pd.Series.ewm(df['Close'], span = n_fast, min_periods = n_slow - 1).mean())
-    EMAslow = Series(pd.Series.ewm(df['Close'], span = n_slow, min_periods = n_slow - 1).mean())
-    MACD = Series(EMAfast - EMAslow, name = 'MACD_' + str(n_fast) + '_' + str(n_slow))
-    MACDsign = Series(pd.Series.ewm(MACD, span = n_signal, min_periods = n_signal - 1).mean(), name = 'MACDsignal_' + str(n_fast) + '_' + str(n_slow))
-    MACDdiff = Series(MACD - MACDsign, name = 'MACDdiff_' + str(n_fast) + '_' + str(n_slow))
-    macd = concat(objs=[MACD, MACDsign, MACDdiff], axis = 1)
-    return macd
-
-MACD2(df)
+# <editor-fold> MISC
+def plotLinearFit (df, window, offset, saveImg = False, saveIndex = ''):
+    x = range(0, window)
+    y = df['Close'][offset : offset + window].values
+    a = np.polyfit(x, y, 1)
+    fit = [.0 for i in range(window)]
+    prediction = 0
+    for j in range(1, -1, -1):
+        prediction += a[1 - j]*(window**j)
+    for i in range(window):
+        fit[i] = a[1] + a[0]*x[i]
+    fig, ax = plt.subplots(1, 1, figsize=(10,10))
+    ax.set_title('Prediction Method', fontsize = 20, fontweight = 'bold')
+    ax.plot(x, y, 'bo', label="data")
+    ax.plot(x, fit, 'g', label="fitted")
+    ax.plot(window, prediction, 'ro', label="predicted")
+    ax.plot(window, df['Close'][offset + window], 'bo')
+    plt.legend()
+    if saveImg:
+        fig.savefig('{}/trend_fit_{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+# </editor-fold>

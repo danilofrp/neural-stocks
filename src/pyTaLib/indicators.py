@@ -4,11 +4,33 @@ from math import *
 
 #Moving Average
 def SMA(df, column, n):
-    return Series(rolling_mean(df[column], n), name = column + '_SMA_' + str(n))
+    """ Simple Moving Average
+    Parameters
+    ----------
+    df : pandas.DataFrame object
+    column : string, DataFrame column desired for calculation of moving average
+    n : int, length of moving average
+
+    Returns
+    ----------
+    SMA_[n] : pandas.Series, simple moving average (values before [n] samples will be NaN)
+    """
+    return Series(rolling_mean(df[column], n), name = column + '_SMA' + str(n))
 
 #Exponential Moving Average
 def EMA(df, column, n):
-    return Series(Series.ewm(df[column], span = n, min_periods = n - 1).mean(), name = column + '_EMA_' + str(n))
+    """ Exponential Moving Average
+    Parameters
+    ----------
+    df : pandas.DataFrame object
+    column : string, DataFrame column desired for calculation of moving average
+    n : int, length of moving average
+
+    Returns
+    ----------
+    EMA_[n] : pandas.Series, exponential moving average (values before [n] samples will be NaN)
+    """
+    return Series(Series.ewm(df[column], span = n, min_periods = n - 1).mean(), name = column + '_EMA' + str(n))
 
 #Momentum
 def MOM(df, column, n):
@@ -37,14 +59,28 @@ def ATR(df, n):
 
 #Bollinger Bands
 def BBANDS(df, n = 20):
+    """ Bollinger Bands
+    Parameters
+    ----------
+    df : pandas.DataFrame object ('Close' colum assumed to be present)
+    n : int, length of moving average, default 20
+
+    Returns
+    ----------
+    BBANDS : pandas.DataFrame, containing the columns (where [n] is the given input):
+                - BollingerMA_[n]: simple moving average of [n] periods
+                - BollingerUpper_[n]: upper band limit (MA + 2 * STD)
+                - BollingerLower_[n]: lower band limit (MA - 2 * STD)
+                - Bollinger%b_[n]: relative position of Close to band limits (0 = lower, .5 = MA, 1 = upper)
+    """
     MA = Series(rolling_mean(df['Close'], n))
     MSD = Series(rolling_std(df['Close'], n))
     BMA = Series(MA, name = 'BollingerMA_' + str(n))
-    b1 = 4 * MSD / MA
-    B1 = Series(b1, name = 'BollingerBW_' + str(n))
-    b2 = (df['Close'] - (MA - 2 * MSD)) / (4 * MSD)
-    B2 = Series(b2, name = 'Bollinger%b_' + str(n))
-    BB = concat([BMA, B1, B2], axis = 1)
+    BUp = Series(BMA + 2 * MSD, name = 'BollingerUpper_' + str(n))
+    BLow = Series(BMA - 2 * MSD, name = 'BollingerLower_' + str(n))
+    bp = (df['Close'] - (MA - 2 * MSD)) / (4 * MSD)
+    Bp = Series(bp, name = 'Bollinger%b_' + str(n))
+    BB = concat([BMA, BUp, BLow, Bp], axis = 1)
     return BB
 
 #Pivot Points, Supports and Resistances
@@ -122,6 +158,21 @@ def ADX(df, n, n_ADX):
 
 #MACD, MACD Signal and MACD difference
 def MACD(df, n_fast = 12, n_slow = 26, n_signal = 9):
+    """ Moving Average Convergence/Divergence
+    Parameters
+    ----------
+    df : pandas.DataFrame object ('Close' colum assumed to be present)
+    n_fast : int, length of fast moving average, default 12
+    n_slow : int, length of slow moving average, default 26
+    n_signal : int, length of signal moving average, default 9
+
+    Returns
+    ----------
+    MACD : pandas.DataFrame, containing the columns (where [n_...] are the given inputs):
+                - MACD_[n_fast]_[n_slow]: Difference between [n_fast] EMA and [n_slow] EMA
+                - MACDsignal_[n_fast]_[n_slow]: [n_signal]-period moving average of MACD
+                - MACDdiff_[n_fast]_[n_slow]: difference between MACD and MACDsignal
+    """
     EMAfast = Series(Series.ewm(df['Close'], span = n_fast, min_periods = n_slow - 1).mean())
     EMAslow = Series(Series.ewm(df['Close'], span = n_slow, min_periods = n_slow - 1).mean())
     MACD = Series(EMAfast - EMAslow, name = 'MACD_' + str(n_fast) + '_' + str(n_slow))
