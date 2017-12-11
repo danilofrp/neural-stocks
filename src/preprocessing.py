@@ -4,20 +4,38 @@ sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import NullFormatter
+from scipy import signal
 from scipy.stats import entropy
 from datetime import date, datetime, timedelta
 from pandas.core.nanops import nanmean as pd_nanmean
-from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.arima_model import ARIMA, ARIMAResults
 from statsmodels.tsa.stattools import periodogram, adfuller, acf, pacf
 from math import isnan
 from pyTaLib.indicators import *
+from neuralstocks.plots import *
+from __future__ import print_function
 %matplotlib inline
 # </editor-fold>
 
 # <editor-fold> FUNCTIONS DEF
-def insertMissingDays(df):
+def insertHolidays(df):
+    """
+    Inserts Holidays in a time series, replicating the last value. Adds a
+    'Holiday' column in the dataset, where 1 indicates a holiday and 0
+    indicates an usual business day. This function does not contain a
+    callendar, it treats every missing business as a holiday. This function
+    does not insert weekends in the dataframe.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame object, dataframe in which to insert holidays. Indexes
+    must be of type datetime.
+
+    Returns
+    ----------
+    df : pandas.DataFrame object, original dataframe with holidays added and new
+       'Holidays' column
+    """
     start = df.index[0]
     end = df.index[-1]
     step = timedelta(days=1)
@@ -36,13 +54,13 @@ def insertMissingDays(df):
     return df
 
 def logReturns(s1, s2 = pd.Series([])):
-    """Log Returns of time series
+    """
+    Log Returns of time series
+
     Parameters
     ----------
-    s1, s2 : pandas.Series objects
-             if s2 is not defined, calculates log
-             returns between actual and
-             previous samples of s1
+    s1, s2 : pandas.Series objects if s2 is not defined, calculates log returns
+    between actual and previous samples of s1
 
     Returns
     ----------
@@ -55,7 +73,9 @@ def logReturns(s1, s2 = pd.Series([])):
         return pd.Series(np.log(s1/s2), name = columnName)
 
 def calculateSMAs(df, column, lenghts):
-    """Simple Moving Averages calculation
+    """
+    Simple Moving Averages calculation
+
     Parameters
     ----------
     df : pandas.DataFrame object
@@ -75,7 +95,9 @@ def calculateSMAs(df, column, lenghts):
     return df
 
 def calculateEMAs(df, column, lenghts):
-    """Exponential Moving Averages calculation
+    """
+    Exponential Moving Averages calculation
+
     Parameters
     ----------
     df : pandas.DataFrame object
@@ -96,7 +118,9 @@ def calculateEMAs(df, column, lenghts):
     return df
 
 def acquireData(replicateForHolidays = False, meanStdLen = None, returnCalcParams = [], SMAcols = [], SMAparams = [], EMAcols = [], EMAparams = [], dropNan = False):
-    """Data Acquisition
+    """
+    Data Acquisition
+
     Parameters
     ----------
     replicateForHolidays : bool, indicates wheter or not to insert holidays in the
@@ -129,7 +153,7 @@ def acquireData(replicateForHolidays = False, meanStdLen = None, returnCalcParam
     df = df.sort_index() #csv entries begin from most recent to older dates
 
     if replicateForHolidays:
-        df = insertMissingDays(df)
+        df = insertHolidays(df)
 
     if meanStdLen:
         df = pd.concat([df, pd.Series(df['Close'].rolling(window=meanStdLen,center=False).mean(), name = 'Close_rollMean{}'.format(meanStdLen))], axis=1)
@@ -151,75 +175,46 @@ def acquireData(replicateForHolidays = False, meanStdLen = None, returnCalcParam
 
     return df.dropna() if dropNan else df
 
-def plotSeries(s, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveIndex = ''):
-    initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
-    finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
-    title = '{} {} ({})'.format(asset, s.name, initialPlotDate.strftime('%d/%M/%Y')) if initialPlotDate == finalPlotDate else '{} {} ({} to {})'.format(asset, s.name, initialPlotDate.strftime('%d/%M/%Y'), finalPlotDate.strftime('%d/%M/%Y'))
-
-    fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1)
-    fig.suptitle(title)
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Price')
-    ax.plot(s[initialPlotDate:finalPlotDate])
-    if saveImg:
-        fig.savefig('{}/{}{}.{}'.format(saveImgFolder, column, saveIndex, saveImgFormat), bbox_inches='tight')
-
-def plotReturnSeries(df, column, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveIndex = ''):
-    initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
-    finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
-    title = '{} {} ({})'.format(asset, column, initialPlotDate.strftime('%d/%M/%Y')) if initialPlotDate == finalPlotDate else '{} {} ({} to {})'.format(asset, column, initialPlotDate.strftime('%d/%M/%Y'), finalPlotDate.strftime('%d/%M/%Y'))
-    returnName = column + '_returns'
-
-    fig, ax = plt.subplots(figsize=(10,10), nrows = 2, ncols = 1, sharex = True)
-
-    plt.xlabel('Date')
-    ax[0].set_title(title)
-    ax[0].set_ylabel('Price')
-    ax[0].plot(df[column][initialPlotDate:finalPlotDate])
-    ax[0].grid()
-
-    ax[1].set_ylabel('Returns')
-    ax[1].plot(df[returnName][initialPlotDate:finalPlotDate])
-    ax[1].grid()
-
-    if saveImg:
-        fig.savefig('{}/returns{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
-
-def deTrend(df, column, window, model = 'additive', fitOrder = 1, weights = None, weightModel = None, weightModelWindow = None,
+def deTrend(df, column, window, model = 'additive', fitOrder = 1, weightModel = None, weightModelWindow = None,
             plot = False, initialPlotDate = None, finalPlotDate = None, overlap = False, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
     if window < fitOrder + 1:
         window = fitOrder +1
-        print 'Warning: window must be at least {} samples wide for a fit of order {}. Adjusting window for minimal value.'.format(fitOrder+1, fitOrder)
+        print('Warning: window must be at least {} samples wide for a fit of order {}. Adjusting window for minimal value.'.format(fitOrder+1, fitOrder))
     trendName = column + '_trend'
     residName = column + '_resid'
+    weights = None
 
-    if not weights:
-        if weightModel == 'full_pgram':
-            weights = list(reversed(periodogram(df[column].dropna())[1 : window + 1]))
-            weightModelWindow = weightModelWindow if weightModelWindow else 2 * window
-        elif weightModel == 'full_acorr':
-            weights = list(reversed(acf(df[column].dropna(), nlags= window + 1)[1 : window + 1]))
-            weightModelWindow = weightModelWindow if weightModelWindow else window
-        elif weightModel == 'window_pgram' or weightModel == 'window_acorr':
-            weightModelWindow = weightModelWindow if weightModelWindow else 3 * window
-        elif not weightModel:
-            weightModelWindow = weightModelWindow if weightModelWindow else window
-    elif weights:
-        weightModelWindow = weightModelWindow if weightModelWindow else len(weights)
+    if weightModel == 'full_pgram':
+        weights = list(reversed(periodogram(df[column].dropna())[1 : window + 1]))
+        weightModelWindow = weightModelWindow if weightModelWindow else window
+    elif weightModel == 'full_acorr':
+        weights = list(reversed(np.abs(acf(df[column].dropna(), nlags= window + 1))[1 : window + 1]))
+        weightModelWindow = weightModelWindow if weightModelWindow else window
+    elif weightModel == 'window_pgram':
+        weightModelWindow = weightModelWindow if weightModelWindow or (not weightModelWindow >= 2 * window) else 2 * window
+    elif weightModel == 'window_acorr':
+        weightModelWindow = weightModelWindow if weightModelWindow else window
+    elif not weightModel:
+        weightModelWindow = window
 
     df[trendName] = np.empty(len(df[column]))*np.nan
     x = range(0, window)
     for i in range(0, len(df[column])):
-        if i < weightModelWindow:
+        if i <= weightModelWindow:
             df[trendName].iloc[i] = np.nan
         else:
             if weightModel == 'window_pgram':
-                weights = list(reversed(periodogram(df[column][i - weightModelWindow : i].dropna())[1 : window + 1]))
+                weights = list(reversed(periodogram(df[column][i - weightModelWindow - 1 : i].dropna())[1 : window + 1]))
+                if not checkIfTwoOrMoreValuesAreNotZero(weights):
+                    weights = None
             elif weightModel == 'window_acorr':
-                weights = list(reversed(acf(df[column][i - weightModelWindow : i].dropna(), nlags= window + 1)[1 : window + 1]))
+                weights = list(reversed(np.abs(acf(df[column][i - weightModelWindow - 1: i].dropna(), nlags= window + 1))[1 : window + 1]))
+                if np.isnan(weights).all() or not checkIfTwoOrMoreValuesAreNotZero(weights):
+                    weights = None
             y = df[column][(i - window):i].values
-            a = np.polyfit(x, y, deg = fitOrder, w = weights)
+            # print 'i: {}, xlen: {}, ylen: {}, window: {}, weightModelWindow: {}, weights: {}'.format(i, len(x), len(y), window, weightModelWindow, weights)
+            a = np.polyfit(x, y, deg = fitOrder, w = weights);
             prediction = 0
             for j in range(fitOrder, -1, -1):
                 prediction += a[fitOrder - j]*(window**j)
@@ -250,7 +245,16 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, weights = None
         plt.figtext(0.1, -0.050, 'Window size: {}'.format(window), size = 14)
         plt.figtext(0.1, -0.075, 'Weight model: {:}'.format(weightModel), size = 14)
         if saveImg:
-            fig.savefig('{}/deTrend_result{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+            fig.savefig('{}/deTrend_result{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
+
+def checkIfTwoOrMoreValuesAreNotZero(x):
+    notZero = False
+    for i in range(len(x)):
+        if notZero and x[i] != 0:
+            return True
+        elif x[i] != 0:
+            notZero = True
+    return False
 
 def deSeason(df, column, freq, model = 'additive',
              plot = False, initialPlotDate = None, finalPlotDate = None, saveImg = False, saveIndex = ''):
@@ -293,7 +297,7 @@ def deSeason(df, column, freq, model = 'additive',
         ax[3].set_title('Residuals ({} model)'.format(model))
         ax[3].plot(df[residName][initialPlotDate:finalPlotDate])
         if saveImg:
-            fig.savefig('{}/deSeason_result{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+            fig.savefig('{}/deSeason_result{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
 
 def seasonalMean(s, freq):
     return np.array([pd_nanmean(s[i::freq]) for i in range(freq)])
@@ -336,7 +340,7 @@ def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5
         ax[3].grid()
 
         if saveImg:
-            fig.savefig('{}/decompose{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+            fig.savefig('{}/decompose{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
 
 def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, weights = None, weightModel = None, weightModelWindow = None, saveImg = False, saveIndex = ''):
     df2 = df.copy()
@@ -359,7 +363,7 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
             minIndex = i
     plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
     if saveImg:
-        fig.savefig('{}/deTrend_RMSE{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+        fig.savefig('{}/deTrend_RMSE{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
 
 def deSeasonRMSE(df, column, model = 'additive', maxFreq = 20, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
@@ -383,80 +387,7 @@ def deSeasonRMSE(df, column, model = 'additive', maxFreq = 20, saveImg = False, 
             minIndex = i
     plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex, minValue), arrowprops=dict(facecolor='black', shrink=0.05))
     if saveImg:
-        fig.savefig('{}/deSeason_RMSE{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
-
-def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveIndex = ''):
-    pgram = periodogram(s.dropna())
-    plotEnd = plotEnd if plotEnd else len(s.dropna())/2
-
-    fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1, sharex = True)
-    fig.suptitle('Periodogram')
-    ax.set_xlabel('Period (samples)')
-    if yLog:
-        plt.yscale('log')
-    ax.stem(range(plotInit,plotEnd+1), pgram[plotInit:plotEnd+1])
-    if saveImg:
-        fig.savefig('{}/periodogram{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
-
-def FFT(s, saveImg = False, saveIndex = ''):
-    Fs = 1.0;  # sampling rate
-    Ts = 1.0/Fs; # sampling interval
-    y = s.dropna() - 1 if s.dropna().mean() > 0.5 else s.dropna()
-    n = len(y) # length of the signal
-    k = np.arange(n)
-    T = n/Fs
-    frq = k/T # two sides frequency range
-    frq = frq[range(n/2)] # one side frequency range
-
-    Y = np.fft.fft(y)/n # fft computing and normalization
-    Y = Y[range(n/2)]
-
-    fig, ax = plt.subplots(2, 1, figsize=(15,10))
-    ax[0].plot(y)
-    ax[0].set_xlabel('Time')
-    ax[0].set_ylabel('Amplitude')
-    ax[1].plot(frq,abs(Y), 'r') # plotting the spectrum
-    ax[1].set_xlabel('Freq (1/sample)')
-    ax[1].set_ylabel('|X(freq)|')
-    if saveImg:
-        fig.savefig('{}/fft{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')column
-
-def plotSeasonalDecompose(s, frequency = 1, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveIndex = ''):
-    if isnan(s.iloc[0]):
-        df = df.drop(df.index[0])
-    initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
-    finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
-    title = asset + ' ' + s.name + ' (' + initialPlotDate + ')' if initialPlotDate == finalPlotDate else asset + ' ' + s.name + ' (' + initialPlotDate + ' to ' + finalPlotDate + ')'
-    initialIndex = np.where(df.index == df[initialPlotDate:finalPlotDate].index[0])[0][0]
-    finalIndex = np.where(df.index == df[initialPlotDate:finalPlotDate].index[-1])[0][0] + 1
-
-    result = seasonal_decompose(s.values, model='a', freq=frequency, two_sided=False)
-
-    fig, ax = plt.subplots(figsize=(10,15), nrows = 4, ncols = 1)
-
-    plot_data = df[initialPlotDate:finalPlotDate]
-    plt.xlabel('Date')
-    ax[0].set_title(title)
-    ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data[s.name],'b-')
-    #ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data['Open'],'r:')
-    #ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data['High'],'g:')
-    #ax[0].plot(df[initialPlotDate:finalPlotDate].index,plot_data['Low'],'g:')
-    ax[0].grid()
-
-    ax[1].set_title('trend')
-    ax[1].plot(df[initialPlotDate:finalPlotDate].index,result.trend[initialIndex:finalIndex])
-    ax[1].grid()
-
-    ax[2].set_title('seasonal')
-    ax[2].plot(df[initialPlotDate:finalPlotDate].index,result.seasonal[initialIndex:finalIndex])
-    ax[2].grid()
-
-    ax[3].set_title('resid')
-    ax[3].plot(df[initialPlotDate:finalPlotDate].index,result.resid[initialIndex:finalIndex])
-    ax[3].grid()
-
-    if saveImg:
-        fig.savefig('{}/seasonal_decompose{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+        fig.savefig('{}/deSeason_RMSE{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
 
 def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg = False, saveIndex = ''):
     initialPlotDate = initialPlotDate if initialPlotDate else ts.index[0]
@@ -492,147 +423,7 @@ def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg =
     plt.figtext(0.1, -0.175, 'Critical Value (10%) {:39.6f}'.format(dfoutput['Critical Value (10%)']), size = 14)
 
     if saveImg:
-        fig.savefig('{}/testStationarity{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
-
-def plotAcf(s, lags = 10, partialAcf = False, saveImg = False, saveIndex = ''):
-    lag_acf = acf(s.dropna(), nlags=lags)
-    if partialAcf:
-        lag_pacf = pacf(s.dropna(), nlags=lags, method='ols')
-
-    fig, ax = plt.subplots(figsize=(20 if partialAcf else 10,10), nrows = 1, ncols = 2 if partialAcf else 1)
-    if not partialAcf:
-        #Plot ACF:
-        ax.set_title('Autocorrelation Function')
-        ax.set_xlabel('Lags')
-        ax.stem(range(1,len(lag_acf)),lag_acf[1:])
-        ax.axhline(y=0,linestyle='--',color='gray')
-        ax.axhline(y=-7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        ax.axhline(y=7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-    else:
-        #Plot ACF:
-        ax[0].set_title('Autocorrelation Function')
-        ax[0].set_xlabel('Lags')
-        ax[0].stem(range(1,len(lag_acf)),lag_acf[1:])
-        ax[0].axhline(y=0,linestyle='--',color='gray')
-        ax[0].axhline(y=-7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        ax[0].axhline(y=7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        #Plot PACF:
-        ax[1].set_title('Partial Autocorrelation Function')
-        ax[1].set_xlabel('Lags')
-        ax[1].stem(lag_pacf)
-        ax[1].axhline(y=0,linestyle='--',color='gray')
-        ax[1].axhline(y=-7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        ax[1].axhline(y=7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-
-    if saveImg:
-        fig.savefig('{}/acf_pacf{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
-
-def crosscorrelation(x, y, nlags = 0):
-    """Cross correlations calculatins until nlags.
-    Parameters
-    ----------
-    nlags : int, number of lags to calculate cross-correlation, default 0
-    x, y : pandas.Series objects of equal length
-
-    Returns
-    ----------
-    crosscorrelation : [float]
-    """
-    return [x.corr(y.shift(lag)) for lag in range(nlags + 1)]
-
-def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveIndex = 0):
-    """Cross correlations calculatins until nlags.
-    Parameters
-    ----------
-    x, y : pandas.Series objects of equal length
-    nlags : int, number of lags to calculate cross-correlation, default 10
-    saveImg : bool, saves image to save directory if True, default False
-    saveIndex: string, sufix to add to saved image file name, default empty
-    """
-    crosscorrelationelation = crosscorrelation(x, y, nlags)
-
-    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1)
-    #Plot ACF:
-    ax.set_title('crosscorrelationelation ({} and {})'.format(x.name, y.name))
-    ax.set_xlabel('Lags')
-    ax.stem(crosscorrelationelation)
-    ax.axhline(y=0,linestyle='--',color='gray')
-    ax.axhline(y=-7.96/np.sqrt(max(len(x), len(y))),linestyle='--',color='gray')
-    ax.axhline(y=7.96/np.sqrt(max(len(x), len(y))),linestyle='--',color='gray')
-    if saveImg:
-        fig.savefig('{}/crosscorrelation_{}_{}_{}.{}'.format(saveImgFolder, x.name, y.name,  saveIndex, saveImgFormat), bbox_inches='tight')
-
-def histogram(series, colors, nBins, saveImg = False, saveIndex = 0):
-    maximum = minimum = series[0].dropna().mean()
-    for s in series:
-        maximum = s.dropna().max() if s.dropna().max() > maximum else maximum
-        minimum = s.dropna().min() if s.dropna().min() < minimum else minimum
-    binCenters = np.linspace(minimum, maximum, nBins)
-    fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
-    for i in range(len(series)):
-        ax.hist(series[i].dropna(), bins = binCenters, normed = 1, fc = colors[i], alpha=0.3, label = series[i].name)
-    if len(series) == 2:
-        kld = KLDiv(series[0], series[1], nBins = nBins, bins = binCenters)
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, loc='best')
-    if len(series) == 2:
-        plt.figtext(0.1,  0.010, 'KL Divergence: {}'.format(kld), size = 14, verticalalignment = 'center')
-
-def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
-    maximum = max(p.dropna().max(), q.dropna().max())
-    minimum = min(p.dropna().min(), q.dropna().min())
-    [p_pdf,p_bins] = np.histogram(p.dropna(), bins = nBins, range = (minimum, maximum), density = True)
-    [q_pdf,q_bins] = np.histogram(q.dropna(), bins = nBins, range = (minimum, maximum), density = True)
-    kl_values = []
-    for i in range(len(p_pdf)):
-        if p_pdf[i] == 0 or q_pdf[i] == 0 :
-            kl_values = np.append(kl_values,0)
-        else:
-            kl_value = np.abs(p_pdf[i]*np.log10(p_pdf[i]/q_pdf[i]))
-            if np.isnan(kl_value):
-                kl_values = np.append(kl_values,0)
-            else:
-                kl_values = np.append(kl_values,kl_value)
-    return np.sum(kl_values)
-
-def scatterHist(s1, s2, nBins):
-    s1 = s1
-    s2 = s2
-    nullfmt = NullFormatter()
-
-    left, width = 0.1, 0.65
-    bottom, height = 0.1, 0.65
-    bottom_h = left_h = left + width + 0.02
-    rect_scatter = [left, bottom, width, height]
-    rect_histx = [left, bottom_h, width, 0.2]
-    rect_histy = [left_h, bottom, 0.2, height]
-
-    plt.figure(1, figsize=(15, 15))
-
-    axScatter = plt.axes(rect_scatter)
-    axHistx = plt.axes(rect_histx)
-    axHisty = plt.axes(rect_histy)
-
-    axHistx.xaxis.set_major_formatter(nullfmt)
-    axHisty.yaxis.set_major_formatter(nullfmt)
-
-    axScatter.grid()
-    axScatter.scatter(s1, s2)
-
-    maximum = max(s1.dropna().max(), s2.dropna().max())
-    minimum = min(s1.dropna().min(), s2.dropna().min())
-    binCenters = np.linspace(minimum, maximum, nBins)
-
-    axScatter.set_xlim((minimum - 1, maximum + 1))
-    axScatter.set_ylim((minimum - 1, maximum + 1))
-
-    axHistx.hist(s1.dropna(), bins=binCenters, fc = 'black', label = 'Observed')
-    axHisty.hist(s2.dropna(), bins=binCenters, orientation='horizontal', label = 'Predicted')
-
-    axHistx.set_title('Observed')
-    axHisty.set_title('Predicted', rotation = -90, x = 1.05, y = 0.5)
-    axHistx.set_xlim(axScatter.get_xlim())
-    axHisty.set_ylim(axScatter.get_ylim())
+        fig.savefig('{}/testStationarity{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
 
 # </editor-fold>
 
@@ -644,10 +435,10 @@ frequency = 'diario'
 
 decomposeModel = 'additive'
 
-saveImgFolder = '/home/danilofrp/projeto_final/results/preprocessing/misc'
-if not os.path.exists(saveImgFolder):
-    os.makedirs(saveImgFolder)
-saveImgFormat = 'png'
+saveDir = '/home/danilofrp/projeto_final/results/preprocessing/misc'
+if not os.path.exists(saveDir):
+    os.makedirs(saveDir)
+saveFormat = 'png'
 
 plt.rcParams['font.weight'] = 'bold'
 plt.rcParams['figure.titlesize'] = 18
@@ -668,98 +459,60 @@ df = acquireData(replicateForHolidays = True,
                  dropNan = False)
 df.tail(10)
 
-plotSeries(df['Close'], initialPlotDate = '', finalPlotDate = '', saveImg = False, saveIndex = '')
+plotSeries(df['Close'], asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-plotReturnSeries(df, column = 'Close', initialPlotDate='', finalPlotDate='', saveImg = False, saveIndex = '')
+plotReturnSeries(df, column = 'Close', asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weights = None, weightModel = None,
+deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = None,
             plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
 
-deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'full_pgram',
+deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weightModel = 'full_pgram',
             plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
 
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'window_pgram',
+deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram',
             plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
 
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'window_acorr',
+deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr',
             plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
-deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 10, weights = None, weightModel = None, saveImg = False, saveIndex = '')
+deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 10, weightModel = None, saveImg = False, saveIndex = '')
 
-deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weights = None, weightModel = 'full_pgram', saveImg = False, saveIndex = '')
+deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'full_pgram', saveImg = False, saveIndex = '')
 
-deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weights = None, weightModel = 'window_pgram', saveImg = False, saveIndex = '')
+deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'window_pgram', saveImg = False, saveIndex = '')
 
-deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weights = None, weightModel = 'window_acorr', saveImg = False, saveIndex = '')
+deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'window_acorr', saveImg = False, saveIndex = '')
 
 deSeasonRMSE(df, column = 'Close', model = decomposeModel, maxFreq = 75, saveImg = False, saveIndex = '')
 
 decompose(df, column = 'Close', model = decomposeModel, window = 3, freq = 5,
           plot = False, initialPlotDate = '2008', finalPlotDate = '2008')
 
-plotPeriodogram(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLog = False, saveImg = False, saveIndex = '')
+plotPeriodogramStats(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLog = False, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-FFT(df['Close_EMA72_logdiff'], saveImg = False, saveIndex = '')
+plotPeriodogramSciPy(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLog = False, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-plotSeasonalDecompose(df['Close'], frequency=5, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveIndex = '')
+plotFFT(df['Close_EMA72_logdiff'], saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+
+plotSeasonalDecompose(df['Close'],  asset = asset, frequency=5, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 testStationarity(df['Close_resid'], window=20, initialPlotDate='', finalPlotDate='', saveImg = False, saveIndex = '')
 
-plotAcf(df['Close'][:'2012'][-80:], lags = 20, partialAcf = False, saveImg = False, saveIndex = '')
+plotAcf(df['Close'][:'2008'][-20:], lags = 40, partialAcf = False, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-plotCrosscorrelation(df['Close/Open_returns'], df['Close_EMA17_logdiff'], 50)
+plotCrosscorrelation(df['Close_returns'], df['Close_EMA72_logdiff'], 50, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-histogram([df['Close'], df['Close_trend']], colors = ['b', 'r'], nBins=100)
+histogram([df['Close'], df['Close_trend']], colors = ['b', 'r'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
-deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weights = None, weightModel = None, plot = False)
+deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'full_pgram', plot = False)
 ax.plot(df['Close_trend'], df['Close'], 'bo')
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'periodogram', plot = False)
+deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'window_pgram', plot = False)
 ax.plot(df['Close_trend'], df['Close'], 'ro', alpha=0.5)
 
-def scatterHist(s1, s2, nBins):
-    s1 = s1
-    s2 = s2
-    nullfmt = NullFormatter()
-
-    left, width = 0.1, 0.65
-    bottom, height = 0.1, 0.65
-    bottom_h = left_h = left + width + 0.02
-    rect_scatter = [left, bottom, width, height]
-    rect_histx = [left, bottom_h, width, 0.2]
-    rect_histy = [left_h, bottom, 0.2, height]
-
-    plt.figure(1, figsize=(15, 15))
-
-    axScatter = plt.axes(rect_scatter)
-    axHistx = plt.axes(rect_histx)
-    axHisty = plt.axes(rect_histy)
-
-    axHistx.xaxis.set_major_formatter(nullfmt)
-    axHisty.yaxis.set_major_formatter(nullfmt)
-
-    axScatter.grid()
-    axScatter.scatter(s1, s2)
-
-    maximum = max(s1.dropna().max(), s2.dropna().max())
-    minimum = min(s1.dropna().min(), s2.dropna().min())
-    binCenters = np.linspace(minimum, maximum, nBins)
-
-    axScatter.set_xlim((minimum - 1, maximum + 1))
-    axScatter.set_ylim((minimum - 1, maximum + 1))
-
-    axHistx.hist(s1.dropna(), bins=binCenters, fc = 'black', label = 'Observed')
-    axHisty.hist(s2.dropna(), bins=binCenters, orientation='horizontal', label = 'Predicted')
-
-    axHistx.set_title('Observed')
-    axHisty.set_title('Predicted', rotation = -90, x = 1.05, y = 0.5)
-    axHistx.set_xlim(axScatter.get_xlim())
-    axHisty.set_ylim(axScatter.get_ylim())
-
-
-scatterHist(df['Close'], df['Close_trend'], 100)
+scatterHist(df['Close'], df['Close_trend'], nBins = 100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 # </editor-fold>
 
@@ -772,7 +525,7 @@ ax.plot(df['Close_r']['2016-07':'2016-12'])
 ax.plot(results_ARIMA.fittedvalues['2016-07':'2016-12'], color='red')
 ax.axhline(y=0,linestyle='--',color='gray')
 ax.set_title('RSS: %.4f'% sum((results_ARIMA.fittedvalues['2016-07':'2016-12']-df['Close_r']['2016-07':'2016-12'])**2))
-#fig.savefig('{}/arima_fitted3.{}'.format(saveImgFolder, saveImgFormat), bbox_inches='tight')
+#fig.savefig('{}/arima_fitted3.{}'.format(saveDir, saveFormat), bbox_inches='tight')
 
 
 print(results_ARIMA.summary())
@@ -791,30 +544,77 @@ fig, ax = plt.subplots(figsize=(15,10), nrows = 1, ncols = 1, sharex = True)
 ax.plot(df['Close'][:'2016'])
 ax.plot(predictions_ARIMA[:'2016'])
 ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:'2016'])**2)/len(df['Close'][:'2016'])))
-#fig.savefig('{}/close_fitted1.{}'.format(saveImgFolder, saveImgFormat), bbox_inches='tight')
+#fig.savefig('{}/close_fitted1.{}'.format(saveDir, saveFormat), bbox_inches='tight')
 
 # </editor-fold>
 
+
 # <editor-fold> MISC
-def plotLinearFit (df, window, offset, weights = None, saveImg = False, saveIndex = ''):
-    x = range(0, window)
-    y = df['Close'][offset : offset + window].values
-    a = np.polyfit(x, y, deg = 1, w = weights)
-    fit = [.0 for i in range(window)]
-    prediction = 0
-    for j in range(1, -1, -1):
-        prediction += a[1 - j]*(window**j)
-    for i in range(window):
-        fit[i] = a[1] + a[0]*x[i]
-    fig, ax = plt.subplots(1, 1, figsize=(10,10))
-    ax.set_title('Prediction Method', fontsize = 20, fontweight = 'bold')
-    ax.plot(x, y, 'bo', label="data")
-    ax.plot(x, fit, 'g', label="fitted")
-    ax.plot(window, prediction, 'ro', label="predicted")
-    ax.plot(window, df['Close'][offset + window], 'bo')
-    plt.legend()
-    if saveImg:
-        fig.savefig('{}/trend_fit_{}.{}'.format(saveImgFolder, saveIndex, saveImgFormat), bbox_inches='tight')
+df2 = df.copy()
+windowMaxSize = 25
+weightModelWindowMaxSize = 6
+model = 'additive'
+column = 'Close'
+RMSE = np.empty((windowMaxSize + 1, weightModelWindowMaxSize + 1), dtype=float)*0
+for i in range(2, windowMaxSize + 1):
+    for j in range(1, weightModelWindowMaxSize + 1):
+        print('Running deTrend ({}, {})'.format(i, j), end='\r')
+        deTrend(df2, column = column, window = i, model = model, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = j * windowMaxSize)
+        if model.startswith('m'):
+            RMSE[i, j] = np.square((df2['{}_resid'.format(column)] - 1)).sum()/len(df2['{}_resid'.format(column)].dropna())
+        else:
+            RMSE[i, j] = np.square(df2['{}_resid'.format(column)]).sum()/len(df2['{}_resid'.format(column)].dropna())
+        if i == 2 and j == 1:
+            minimal = RMSE[i][j]
+            iMin = i
+            jMin = j
+        if RMSE[i, j] < minimal:
+            minimal = RMSE[i][j]
+            iMin = i
+            jMin = j
+
+print('Minimal RSME = {}, at window = {} and weightModelWindow = {} * window'.format(minimal, iMin, jMin))
+
+fig, ax = plt.subplots(figsize=(10,10))
+# plt.imshow(RMSE[2:,1:], cmap="jet", extent=[0, weightModelWindowMaxSize, 1, windowMaxSize], aspect="auto")
+cax = ax.imshow(RMSE[2:,1:], cmap="jet", aspect="auto")
+plt.gca().invert_yaxis()
+cbar = fig.colorbar(cax)
+
+
+
+df3 = df.copy()
+windowMaxSize = 25
+weightModelWindowMaxSize = 6
+model = 'additive'
+column = 'Close'
+RMSE3 = np.empty((windowMaxSize + 1, weightModelWindowMaxSize + 1), dtype=float)*0
+for i in range(2, windowMaxSize + 1):
+    for j in range(2, weightModelWindowMaxSize + 1):
+        print('Running deTrend ({}, {})'.format(i, j), end='\r')
+        deTrend(df3, column = column, window = i, model = model, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = j * windowMaxSize)
+        if model.startswith('m'):
+            RMSE3[i, j] = np.square((df3['{}_resid'.format(column)] - 1)).sum()/len(df3['{}_resid'.format(column)].dropna())
+        else:
+            RMSE3[i, j] = np.square(df3['{}_resid'.format(column)]).sum()/len(df3['{}_resid'.format(column)].dropna())
+        if i == 2 and j == 2:
+            minimal = RMSE3[i][j]
+            iMin = i
+            jMin = j
+        if RMSE3[i, j] < minimal:
+            minimal = RMSE3[i][j]
+            iMin = i
+            jMin = j
+
+print('Minimal RSME = {}, at window = {} and weightModelWindow = {} * window'.format(minimal, iMin, jMin))
+
+fig, ax = plt.subplots(figsize=(10,10))
+# plt.imshow(RMSE3[2:,1:], cmap="jet", extent=[0, weightModelWindowMaxSize, 1, windowMaxSize], aspect="auto")
+cax = ax.imshow(RMSE3[2:,2:], cmap="jet", aspect="auto")
+plt.gca().invert_yaxis()
+cbar = fig.colorbar(cax)
+
+
 
 df2 = df.copy()
 windowMaxSize = 20
@@ -832,11 +632,6 @@ for i in range(2, windowMaxSize + 1):
             RSS[i, j] = np.square(df2['{}_resid'.format(column)]).sum()
 
 fig, ax = plt.subplots(figsize=(10,10))
-
 plt.imshow(RSS[2:,:], cmap="jet", extent=[2, windowMaxSize, 0, maxFreq], aspect="auto")
 cbar = plt.colorbar()
 # </editor-fold>
-
-window = 25
-weights = list(reversed(periodogram(df['Close'].dropna())[1 : window + 1]))
-plotLinearFit(df, window, 1008, weights)
