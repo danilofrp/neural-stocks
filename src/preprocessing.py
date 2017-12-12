@@ -13,6 +13,7 @@ from statsmodels.tsa.stattools import periodogram, adfuller, acf, pacf
 from math import isnan
 from pyTaLib.indicators import *
 from neuralstocks.plots import *
+from neuralstocks.utils import *
 from __future__ import print_function
 %matplotlib inline
 # </editor-fold>
@@ -176,7 +177,7 @@ def acquireData(replicateForHolidays = False, meanStdLen = None, returnCalcParam
     return df.dropna() if dropNan else df
 
 def deTrend(df, column, window, model = 'additive', fitOrder = 1, weightModel = None, weightModelWindow = None,
-            plot = False, initialPlotDate = None, finalPlotDate = None, overlap = False, saveImg = False, saveIndex = ''):
+            plot = False, initialPlotDate = None, finalPlotDate = None, overlap = False, detailed = False, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
     if window < fitOrder + 1:
         window = fitOrder +1
@@ -185,42 +186,19 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, weightModel = 
     residName = column + '_resid'
     weights = None
 
-    if weightModel == 'full_pgram':
-        weights = list(reversed(periodogram(df[column].dropna())[1 : window + 1]))
-        weightModelWindow = weightModelWindow if weightModelWindow else window
-    elif weightModel == 'full_acorr':
-        weights = list(reversed(np.abs(acf(df[column].dropna(), nlags= window + 1))[1 : window + 1]))
-        weightModelWindow = weightModelWindow if weightModelWindow else window
-    elif weightModel == 'window_pgram':
-        weightModelWindow = weightModelWindow if weightModelWindow or (not weightModelWindow >= 2 * window) else 2 * window
-    elif weightModel == 'window_acorr':
-        weightModelWindow = weightModelWindow if weightModelWindow else window
-    elif not weightModel:
-        weightModelWindow = window
+    weights, weightModelWindow = getWeights(df[column], window = window, weightModel = weightModel, weightModelWindow = weightModelWindow)
 
     df[trendName] = np.empty(len(df[column]))*np.nan
-    x = range(0, window)
     for i in range(0, len(df[column])):
         if i <= weightModelWindow:
             df[trendName].iloc[i] = np.nan
         else:
-            if weightModel == 'window_pgram':
-                weights = list(reversed(periodogram(df[column][i - weightModelWindow - 1 : i].dropna())[1 : window + 1]))
-                if not checkIfTwoOrMoreValuesAreNotZero(weights):
-                    weights = None
-            elif weightModel == 'window_acorr':
-                weights = list(reversed(np.abs(acf(df[column][i - weightModelWindow - 1: i].dropna(), nlags= window + 1))[1 : window + 1]))
-                if np.isnan(weights).all() or not checkIfTwoOrMoreValuesAreNotZero(weights):
-                    weights = None
-            y = df[column][(i - window):i].values
-            # print 'i: {}, xlen: {}, ylen: {}, window: {}, weightModelWindow: {}, weights: {}'.format(i, len(x), len(y), window, weightModelWindow, weights)
-            a = np.polyfit(x, y, deg = fitOrder, w = weights);
-            prediction = 0
-            for j in range(fitOrder, -1, -1):
-                prediction += a[fitOrder - j]*(window**j)
-            df.set_value(df.index[i], trendName, prediction)
+            if weightModel.startswith('window_'):
+                weights, weightModelWindow = getWeights(df[column][i - weightModelWindow - 1 : i], window = window, weightModel = weightModel, weightModelWindow = weightModelWindow)
+            df.set_value(df.index[i], trendName, predict(x = range(0, window), y = df[column][(i - window):i].values, fitOrder = fitOrder, weights = weights, window = window))
 
-    df[residName] = df[column] / df[trendName] if model == 'multiplicative' else df[column] - df[trendName]
+    df[residName] = df[column] / df[trendName] if model.startswith('m') else df[column] - df[trendName]
+    RMSE = (np.square(df['{}_resid'.format(column)].dropna() - int(model.startswith('m'))).sum())/(len(df.dropna()))
 
     if plot:
         initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
@@ -240,21 +218,15 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, weightModel = 
         ax[1 + int(not overlap)].set_title('Observed {} Trend'.format(signal))
         ax[1 + int(not overlap)].plot(df[residName][initialPlotDate:finalPlotDate])
 
-        plt.figtext(0.1,  0.010, 'deTrend Parameters', size = 14, verticalalignment = 'center')
-        plt.figtext(0.1, -0.025, 'Model: {}'.format(model), size = 14)
-        plt.figtext(0.1, -0.050, 'Window size: {}'.format(window), size = 14)
-        plt.figtext(0.1, -0.075, 'Weight model: {:}'.format(weightModel), size = 14)
+        if detailed:
+            plt.figtext(0.1,  0.010, 'deTrend Parameters', size = 14, verticalalignment = 'center')
+            plt.figtext(0.1, -0.025, 'Model: {}'.format(model), size = 14)
+            plt.figtext(0.1, -0.050, 'Window size: {}'.format(window), size = 14)
+            plt.figtext(0.1, -0.075, 'Weight model: {}'.format(weightModel), size = 14)
+            plt.figtext(0.1, -0.100, 'Weight model window size: {}'.format(weightModelWindow), size = 14)
+            plt.figtext(0.1, -0.125, 'Prediction RMSE: {}'.format(RMSE), size = 14)
         if saveImg:
             fig.savefig('{}/deTrend_result{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
-
-def checkIfTwoOrMoreValuesAreNotZero(x):
-    notZero = False
-    for i in range(len(x)):
-        if notZero and x[i] != 0:
-            return True
-        elif x[i] != 0:
-            notZero = True
-    return False
 
 def deSeason(df, column, freq, model = 'additive',
              plot = False, initialPlotDate = None, finalPlotDate = None, saveImg = False, saveIndex = ''):
@@ -463,17 +435,17 @@ plotSeries(df['Close'], asset = asset,  initialPlotDate = '', finalPlotDate = ''
 
 plotReturnSeries(df, column = 'Close', asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = None,
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
+deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = None, weightModelWindow = 25,
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True saveImg = False, saveIndex = '')
 
-deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weightModel = 'full_pgram',
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
+deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weightModel = 'full_pgram', weightModelWindow = 25,
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True saveImg = False, saveIndex = '')
 
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram',
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
+deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = 25,
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True saveImg = False, saveIndex = '')
 
-deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr',
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, saveImg = False, saveIndex = '')
+deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = 25,
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True, saveImg = False, saveIndex = '')
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
@@ -504,7 +476,7 @@ plotAcf(df['Close'][:'2008'][-20:], lags = 40, partialAcf = False, saveImg = Fal
 
 plotCrosscorrelation(df['Close_returns'], df['Close_EMA72_logdiff'], 50, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-histogram([df['Close'], df['Close_trend']], colors = ['b', 'r'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+histogram([df['Close'], df['Close_EMA17']], colors = ['b', 'r'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
 deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'full_pgram', plot = False)
@@ -547,7 +519,6 @@ ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:
 #fig.savefig('{}/close_fitted1.{}'.format(saveDir, saveFormat), bbox_inches='tight')
 
 # </editor-fold>
-
 
 # <editor-fold> MISC
 df2 = df.copy()

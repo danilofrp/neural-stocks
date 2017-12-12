@@ -6,6 +6,7 @@ from matplotlib.ticker import NullFormatter
 from statsmodels.tsa import stattools
 from statsmodels.tsa.seasonal import seasonal_decompose
 from scipy import signal
+from neuralstocks.utils import *
 
 def plotSeries(s, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     """
@@ -255,19 +256,6 @@ def plotAcf(s, lags = 10, partialAcf = False, saveImg = False, saveDir = '', sav
         saveName = saveName if saveName else '{}_acf'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def crosscorrelation(x, y, nlags = 0):
-    """Cross correlations calculatins until nlags.
-    Parameters
-    ----------
-    nlags : int, number of lags to calculate cross-correlation, default 0
-    x, y : pandas.Series objects of equal length
-
-    Returns
-    ----------
-    crosscorrelation : [float]
-    """
-    return [x.corr(y.shift(lag)) for lag in range(nlags + 1)]
-
 def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     """Cross correlations calculatins until nlags.
     Parameters
@@ -312,23 +300,6 @@ def histogram(series, colors, nBins, saveImg = False, saveDir = '', saveName = '
         else:
             saveName = saveName if saveName else '{}_hist'.format(series[1].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
-
-def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
-    maximum = max(p.dropna().max(), q.dropna().max())
-    minimum = min(p.dropna().min(), q.dropna().min())
-    [p_pdf,p_bins] = np.histogram(p.dropna(), bins = nBins, range = (minimum, maximum), density = True)
-    [q_pdf,q_bins] = np.histogram(q.dropna(), bins = nBins, range = (minimum, maximum), density = True)
-    kl_values = []
-    for i in range(len(p_pdf)):
-        if p_pdf[i] == 0 or q_pdf[i] == 0 :
-            kl_values = np.append(kl_values,0)
-        else:
-            kl_value = np.abs(p_pdf[i]*np.log10(p_pdf[i]/q_pdf[i]))
-            if np.isnan(kl_value):
-                kl_values = np.append(kl_values,0)
-            else:
-                kl_values = np.append(kl_values,kl_value)
-    return np.sum(kl_values)
 
 def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     nullfmt = NullFormatter()
