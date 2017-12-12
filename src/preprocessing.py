@@ -17,10 +17,6 @@ from __future__ import print_function
 %matplotlib inline
 # </editor-fold>
 
-# <editor-fold> FUNCTIONS DEF
-
-# </editor-fold>
-
 # <editor-fold> PARAMS
 dataPath = '/home/danilofrp/projeto_final/data'
 assetType = 'stocks'
