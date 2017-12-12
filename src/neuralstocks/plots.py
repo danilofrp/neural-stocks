@@ -1,6 +1,7 @@
 import sys, os
 sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 from statsmodels.tsa import stattools
@@ -133,6 +134,39 @@ def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, s
         saveName = saveName if saveName else 'linearFitExample'
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
+def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow, RMSE,
+                      initialPlotDate = None, finalPlotDate = None, overlap = False, detailed = False,
+                      saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+    trendName = column + '_trend'
+    residName = column + '_resid'
+    initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
+    finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
+    fig, ax = plt.subplots(figsize=(15,10), nrows = 2 + int(not overlap), ncols = 1, sharex = True)
+    plt.xlabel('Date')
+    title = 'Observed and Predicted' if overlap else 'Observed'
+    ax[0].set_title(title)
+    ax[0].plot(df[column][initialPlotDate:finalPlotDate])
+    if overlap:
+        ax[0].plot(df[trendName][initialPlotDate:finalPlotDate], 'r')
+        ax[0].legend()
+    else:
+        ax[1].set_title('Trend Estimation')
+        ax[1].plot(df[trendName][initialPlotDate:finalPlotDate])
+    signal = '/' if model.startswith('m') else '-'
+    ax[1 + int(not overlap)].set_title('Observed {} Trend'.format(signal))
+    ax[1 + int(not overlap)].plot(df[residName][initialPlotDate:finalPlotDate])
+
+    if detailed:
+        plt.figtext(0.1,  0.010, 'deTrend Parameters', size = 14, verticalalignment = 'center')
+        plt.figtext(0.1, -0.025, 'Model: {}'.format(model), size = 14)
+        plt.figtext(0.1, -0.050, 'Window size: {}'.format(window), size = 14)
+        plt.figtext(0.1, -0.075, 'Weight model: {}'.format(weightModel), size = 14)
+        plt.figtext(0.1, -0.100, 'Weight model window size: {}'.format(weightModelWindow), size = 14)
+        plt.figtext(0.1, -0.125, 'Prediction RMSE: {}'.format(RMSE), size = 14)
+    if saveImg:
+        saveName = saveName if saveName else '{}_deTrend'.format(s.name)
+        fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+
 def plotPeriodogramStats(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     pgram = stattools.periodogram(s.dropna())
     plotEnd = plotEnd if plotEnd else len(s.dropna())/2
@@ -254,6 +288,43 @@ def plotAcf(s, lags = 10, partialAcf = False, saveImg = False, saveDir = '', sav
 
     if saveImg:
         saveName = saveName if saveName else '{}_acf'.format(s.name)
+        fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+
+def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+    initialPlotDate = initialPlotDate if initialPlotDate else ts.index[0]
+    finalPlotDate = finalPlotDate if finalPlotDate else ts.index[-1]
+
+    #Determing rolling statistics
+    rolmean = ts.dropna().rolling(window=window,center=False).mean()
+    rolstd = ts.dropna().rolling(window=window,center=False).std()
+
+    fig, ax = plt.subplots(figsize=(15,10), nrows = 1, ncols = 1, sharex = True)
+    #Plot rolling statistics:
+    ax.plot(ts[initialPlotDate:finalPlotDate], color='blue',label='Original')
+    ax.plot(rolmean[initialPlotDate:finalPlotDate], color='red', label='Rolling Mean')
+    ax.plot(rolstd[initialPlotDate:finalPlotDate], color='black', label = 'Rolling Std')
+    ax.legend(loc='best')
+    ax.set_title('Rolling Mean & Standard Deviation')
+
+    #Perform Dickey-Fuller test:
+    #print 'Results of Dickey-Fuller Test:'
+    dftest = stattools.adfuller(ts.dropna(), autolag='AIC')
+    dfoutput = pd.Series(dftest[0:4], index=['Test Statistic','p-value','#Lags Used','Number of Observations Used'])
+    for key,value in dftest[4].items():
+        dfoutput['Critical Value (%s)'%key] = value
+    #print dfoutput
+
+    plt.figtext(0.1,  0.010, 'Results of Dickey-Fuller Test:', size = 14, verticalalignment = 'center')
+    plt.figtext(0.1, -0.025, 'Test Statistic {:48.6f}'.format(dfoutput['Test Statistic']), size = 14)
+    plt.figtext(0.1, -0.050, 'p-value {:58.6f}'.format(dfoutput['p-value']), size = 14)
+    plt.figtext(0.1, -0.075, '#Lags Used {:51.6f}'.format(dfoutput['#Lags Used']), size = 14)
+    plt.figtext(0.1, -0.100, 'Number of Observations Used {:20.6f}'.format(dfoutput['Number of Observations Used']), size = 14)
+    plt.figtext(0.1, -0.125, 'Critical Value (1%) {:41.6f}'.format(dfoutput['Critical Value (1%)']), size = 14)
+    plt.figtext(0.1, -0.150, 'Critical Value (5%) {:41.6f}'.format(dfoutput['Critical Value (5%)']), size = 14)
+    plt.figtext(0.1, -0.175, 'Critical Value (10%) {:39.6f}'.format(dfoutput['Critical Value (10%)']), size = 14)
+
+    if saveImg:
+        saveName = saveName if saveName else '{}_ADF'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
 def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
