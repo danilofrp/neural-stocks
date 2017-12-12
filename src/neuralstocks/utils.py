@@ -1,6 +1,7 @@
 import sys, os
 sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
+from pandas.core.nanops import nanmean as pd_nanmean
 from scipy.signal import periodogram
 from statsmodels.tsa.stattools import acf
 
@@ -12,13 +13,16 @@ def getWeights(s, window, weightModel, weightModelWindow):
         weights = list(reversed(np.abs(acf(s.dropna(), nlags= window + 1))[1 : window + 1]))
         weightModelWindow = weightModelWindow if weightModelWindow else window
     elif weightModel == 'window_pgram':
-        weightModelWindow = weightModelWindow if weightModelWindow or (not weightModelWindow >= 2 * window) else 2 * window
+        weightModelWindow = weightModelWindow if weightModelWindow and (weightModelWindow >= 2 * window) else 2 * window
         weights = list(reversed(periodogram(s.dropna())[1][1 : window + 1]))
         if not checkIfTwoOrMoreValuesAreNotZero(weights):
+            weightModelWindow = window
             weights = None
     elif weightModel == 'window_acorr':
+        weightModelWindow = weightModelWindow if weightModelWindow else window
         weights = list(reversed(np.abs(acf(s.dropna(), nlags= window + 1))[1 : window + 1]))
         if np.isnan(weights).all() or not checkIfTwoOrMoreValuesAreNotZero(weights):
+            weightModelWindow = window
             weights = None
     elif not weightModel:
         weightModelWindow = window
@@ -40,6 +44,9 @@ def predict(x, y, fitOrder, weights, window):
     for j in range(fitOrder, -1, -1):
         prediction += a[fitOrder - j]*(window**j)
     return prediction
+
+def seasonalMean(s, freq):
+    return np.array([pd_nanmean(s[i::freq]) for i in range(freq)])
 
 def crosscorrelation(x, y, nlags = 0):
     """Cross correlations calculatins until nlags.

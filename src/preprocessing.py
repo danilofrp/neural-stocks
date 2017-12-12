@@ -12,6 +12,7 @@ from statsmodels.tsa.arima_model import ARIMA, ARIMAResults
 from statsmodels.tsa.stattools import periodogram, adfuller, acf, pacf
 from math import isnan
 from pyTaLib.indicators import *
+from neuralstocks.preprocessing import *
 from neuralstocks.plots import *
 from neuralstocks.utils import *
 from __future__ import print_function
@@ -19,104 +20,6 @@ from __future__ import print_function
 # </editor-fold>
 
 # <editor-fold> FUNCTIONS DEF
-def insertHolidays(df):
-    """
-    Inserts Holidays in a time series, replicating the last value. Adds a
-    'Holiday' column in the dataset, where 1 indicates a holiday and 0
-    indicates an usual business day. This function does not contain a
-    callendar, it treats every missing business as a holiday. This function
-    does not insert weekends in the dataframe.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame object, dataframe in which to insert holidays. Indexes
-    must be of type datetime.
-
-    Returns
-    ----------
-    df : pandas.DataFrame object, original dataframe with holidays added and new
-       'Holidays' column
-    """
-    start = df.index[0]
-    end = df.index[-1]
-    step = timedelta(days=1)
-
-    df.loc[:,'Holiday'] = 0
-    while start <= end:
-        if start.weekday() < 5: # 5 - Saturday, 6 - Sunday
-            if not (start in df.index):
-                df.loc[start] = df[:start].iloc[-1]
-                df.loc[start, 'Holiday'] = 1
-                df.sort_index(inplace = True)
-            else:
-                df.loc[start, 'Holiday'] = 0
-        start += step
-
-    return df
-
-def logReturns(s1, s2 = pd.Series([])):
-    """
-    Log Returns of time series
-
-    Parameters
-    ----------
-    s1, s2 : pandas.Series objects if s2 is not defined, calculates log returns
-    between actual and previous samples of s1
-
-    Returns
-    ----------
-    log_returns : pandas.Series
-    """
-    columnName = s1.name + '_returns' if (s2.empty or s1.name == s2.name) else s1.name + '/' + s2.name + '_returns'
-    if s2.empty or s1.name == s2.name:
-        return pd.Series(np.log(s1/s1.shift()), name = columnName)
-    else:
-        return pd.Series(np.log(s1/s2), name = columnName)
-
-def calculateSMAs(df, column, lenghts):
-    """
-    Simple Moving Averages calculation
-
-    Parameters
-    ----------
-    df : pandas.DataFrame object
-    lenghts : int array, set of desired lenghts to calculate moving averages
-
-    Returns
-    ----------
-    df : pandas.DataFrame, original DataFrame concatenated with moving
-        averages and log differences between column moving averages
-    """
-    if isinstance(lenghts, (int, long)):
-        lenghts = [lenghts]
-    for l in lenghts:
-        sma = SMA(df, column, l)
-        df = pd.concat([df, sma], axis = 1)
-        df = pd.concat([df, pd.Series(logReturns(df[column], sma), name='{}_SMA{}_logdiff'.format(column, l))], axis = 1)
-    return df
-
-def calculateEMAs(df, column, lenghts):
-    """
-    Exponential Moving Averages calculation
-
-    Parameters
-    ----------
-    df : pandas.DataFrame object
-    column : string, column from which to calculate Moving Averages
-    lenghts : int array, set of desired lenghts to calculate moving averages
-
-    Returns
-    ----------
-    df : pandas.DataFrame, original DataFrame concatenated with moving
-        averages and log differences between column and moving averages
-    """
-    if isinstance(lenghts, (int, long)):
-        lenghts = [lenghts]
-    for l in lenghts:
-        ema = EMA(df, column, l)
-        df = pd.concat([df, ema], axis = 1)
-        df = pd.concat([df, pd.Series(logReturns(df[column], ema), name='{}_EMA{}_logdiff'.format(column, l))], axis = 1)
-    return df
 
 def acquireData(replicateForHolidays = False, meanStdLen = None, returnCalcParams = [], SMAcols = [], SMAparams = [], EMAcols = [], EMAparams = [], dropNan = False):
     """
@@ -191,7 +94,7 @@ def deTrend(df, column, window, model = 'additive', fitOrder = 1, weightModel = 
     df[trendName] = np.empty(len(df[column]))*np.nan
     for i in range(0, len(df[column])):
         if i <= weightModelWindow:
-            df[trendName].iloc[i] = np.nan
+            df.set_value(df.index[i], trendName, np.nan)
         else:
             if weightModel.startswith('window_'):
                 weights, weightModelWindow = getWeights(df[column][i - weightModelWindow - 1 : i], window = window, weightModel = weightModel, weightModelWindow = weightModelWindow)
@@ -271,9 +174,6 @@ def deSeason(df, column, freq, model = 'additive',
         if saveImg:
             fig.savefig('{}/deSeason_result{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
 
-def seasonalMean(s, freq):
-    return np.array([pd_nanmean(s[i::freq]) for i in range(freq)])
-
 def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5,
               plot = False, initialPlotDate = None, finalPlotDate = None, saveImg = False, saveIndex = ''):
     model = 'multiplicative' if model.startswith('m') else 'additive'
@@ -314,12 +214,12 @@ def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5
         if saveImg:
             fig.savefig('{}/decompose{}.{}'.format(saveDir, saveIndex, saveFormat), bbox_inches='tight')
 
-def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, weights = None, weightModel = None, weightModelWindow = None, saveImg = False, saveIndex = ''):
+def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, weightModel = None, weightModelWindow = None, saveImg = False, saveIndex = ''):
     df2 = df.copy()
     model = 'multiplicative' if model.startswith('m') else 'additive'
     RMSE = np.empty(windowMaxSize + 1)*np.nan
     for i in range(fitOrder + 1, windowMaxSize + 1):
-        deTrend(df2, column = column, window = i, model = model, fitOrder = fitOrder, weights = weights, weightModel = weightModel, weightModelWindow = weightModelWindow)
+        deTrend(df2, column = column, window = i, model = model, fitOrder = fitOrder, weightModel = weightModel, weightModelWindow = weightModelWindow)
         if model == 'multiplicative':
             RMSE[i] = (np.square((df2['{}_resid'.format(column)].dropna() - 1)).sum())/(len(df2.dropna()))
         else:
@@ -436,16 +336,16 @@ plotSeries(df['Close'], asset = asset,  initialPlotDate = '', finalPlotDate = ''
 plotReturnSeries(df, column = 'Close', asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = None, weightModelWindow = 25,
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True saveImg = False, saveIndex = '')
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True, saveImg = False, saveIndex = '')
 
 deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weightModel = 'full_pgram', weightModelWindow = 25,
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True saveImg = False, saveIndex = '')
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True, saveImg = False, saveIndex = '')
 
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = 25,
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True saveImg = False, saveIndex = '')
+deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = 100,
+            plot = True, initialPlotDate = '2008-07', finalPlotDate = '2008-12', overlap = True, detailed = True, saveImg = False, saveIndex = '')
 
 deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = 25,
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True, saveImg = False, saveIndex = '')
+            plot = True, initialPlotDate = '2008-07', finalPlotDate = '2008-12', overlap = True, detailed = True, saveImg = False, saveIndex = '')
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017')
 
@@ -476,12 +376,12 @@ plotAcf(df['Close'][:'2008'][-20:], lags = 40, partialAcf = False, saveImg = Fal
 
 plotCrosscorrelation(df['Close_returns'], df['Close_EMA72_logdiff'], 50, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-histogram([df['Close'], df['Close_EMA17']], colors = ['b', 'r'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+histogram([df['Close'], df['Close_trend']], colors = ['b', 'r'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
-deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'full_pgram', plot = False)
+deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'full_pgram', weightModelWindow = None)
 ax.plot(df['Close_trend'], df['Close'], 'bo')
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weights = None, weightModel = 'window_pgram', plot = False)
+deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = 25)
 ax.plot(df['Close_trend'], df['Close'], 'ro', alpha=0.5)
 
 scatterHist(df['Close'], df['Close_trend'], nBins = 100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
