@@ -4,16 +4,11 @@ sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy import signal
-from datetime import date, datetime, timedelta
-from statsmodels.tsa.stattools import periodogram, adfuller
-from math import isnan
 from pyTaLib.indicators import *
 from neuralstocks.dataacquisition import *
 from neuralstocks.preprocessing import *
 from neuralstocks.plots import *
 from neuralstocks.utils import *
-from __future__ import print_function
 %matplotlib inline
 # </editor-fold>
 
