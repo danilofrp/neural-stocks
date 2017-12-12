@@ -488,38 +488,6 @@ scatterHist(df['Close'], df['Close_trend'], nBins = 100, saveImg = False, saveDi
 
 # </editor-fold>
 
-# <editor-fold> ARIMA
-model = ARIMA(df['Close_r'][:'2016'], order=(2, 1, 1))
-results_ARIMA = model.fit(disp=-1)
-fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1, sharex = True)
-#ax.plot(results_ARIMA.resid['2016-07':'2016-12'])
-ax.plot(df['Close_r']['2016-07':'2016-12'])
-ax.plot(results_ARIMA.fittedvalues['2016-07':'2016-12'], color='red')
-ax.axhline(y=0,linestyle='--',color='gray')
-ax.set_title('RSS: %.4f'% sum((results_ARIMA.fittedvalues['2016-07':'2016-12']-df['Close_r']['2016-07':'2016-12'])**2))
-#fig.savefig('{}/arima_fitted3.{}'.format(saveDir, saveFormat), bbox_inches='tight')
-
-
-print(results_ARIMA.summary())
-# plot residual errors
-residuals = pd.DataFrame(results_ARIMA.resid)
-residuals.plot(kind='kde')
-print(residuals.describe())
-
-predictions_ARIMA_diff = pd.Series(results_ARIMA.fittedvalues, copy=True)
-predictions_ARIMA_diff_cumsum = predictions_ARIMA_diff.cumsum()
-predictions_ARIMA_log = pd.Series(np.log(df['Close'].iloc[1]), index=df['Close'].index)
-#print predictions_ARIMA_log
-predictions_ARIMA_log = predictions_ARIMA_log.add(predictions_ARIMA_diff_cumsum,fill_value=0)
-predictions_ARIMA = np.exp(predictions_ARIMA_log)
-fig, ax = plt.subplots(figsize=(15,10), nrows = 1, ncols = 1, sharex = True)
-ax.plot(df['Close'][:'2016'])
-ax.plot(predictions_ARIMA[:'2016'])
-ax.set_title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA[:'2016']-df['Close'][:'2016'])**2)/len(df['Close'][:'2016'])))
-#fig.savefig('{}/close_fitted1.{}'.format(saveDir, saveFormat), bbox_inches='tight')
-
-# </editor-fold>
-
 # <editor-fold> MISC
 df2 = df.copy()
 windowMaxSize = 25
