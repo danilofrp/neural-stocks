@@ -18,9 +18,9 @@ def getWeights(s, window, weightModel, weightModelWindow):
             weightModelWindow = window
             weights = None
     elif weightModel == 'window_acorr':
-        weightModelWindow = weightModelWindow if weightModelWindow and (weightModelWindow >= window + 2) else window + 2
+        weightModelWindow = weightModelWindow if weightModelWindow and (weightModelWindow >= 2 * window) else 2 * window
         weights = list(reversed(np.abs(autocorrelation(s, nlags = window))[1 : window + 1]))
-        if np.isnan(weights).all() or not checkIfTwoOrMoreValuesAreNotZero(weights):
+        if np.isnan(weights).any() or not checkIfTwoOrMoreValuesAreNotZero(weights):
             weightModelWindow = window
             weights = None
     elif not weightModel:

@@ -377,6 +377,7 @@ def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', sav
 
     axScatter.set_xlim((minimum - 1, maximum + 1))
     axScatter.set_ylim((minimum - 1, maximum + 1))
+    axScatter.plot(range(int(minimum - 2), int(maximum + 5)), range(int(minimum - 2), int(maximum + 5)), 'r')
 
     axHistx.hist(s1.dropna(), bins=binCenters, fc = 'black', label = 'Observed')
     axHisty.hist(s2.dropna(), bins=binCenters, orientation='horizontal', label = 'Predicted')
