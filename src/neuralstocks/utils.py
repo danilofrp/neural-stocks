@@ -91,3 +91,30 @@ def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
     return np.sum(kl_values)
 
 sign = lambda a: int(a>0) - int(a<0)
+
+def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
+    xTrain = []
+    yTrain = []
+    xTest = []
+    yTest = []
+    for i in range(len(df)):
+        xTrainAux = []
+        yTrainAux = []
+        xTestAux = []
+        yTestAux = []
+        if i >= nDelays and i < testSetSize:
+            for column in columnsToUse:
+                if i < testSetSize:
+                    xTrainAux.extend(df[column][i - nDelays : i])
+            yTrainAux.append(df[columnToPredict][i])
+            xTrain.append(xTrainAux)
+            yTrain.append(yTrainAux)
+        if i >= nDelays and i >= testSetSize:
+            for column in columnsToUse:
+                if i < testSetSize:
+                    xTestAux.extend(df[column][i - nDelays : i])
+            yTestAux.append(df[columnToPredict][i])
+            xTest.append(xTestAux)
+            yTest.append(yTestAux)
+
+    return xTrain, yTrain, xTest, yTest
