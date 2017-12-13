@@ -375,9 +375,10 @@ def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', sav
     minimum = min(s1.dropna().min(), s2.dropna().min())
     binCenters = np.linspace(minimum, maximum, nBins)
 
-    axScatter.set_xlim((minimum - 1, maximum + 1))
-    axScatter.set_ylim((minimum - 1, maximum + 1))
-    axScatter.plot(range(int(minimum - 2), int(maximum + 5)), range(int(minimum - 2), int(maximum + 5)), 'r')
+    slack = maximum * 0.1
+    axScatter.set_xlim((minimum - slack, maximum + slack))
+    axScatter.set_ylim((minimum - slack, maximum + slack))
+    axScatter.plot(range(int(minimum - slack), int(maximum + slack) + 1), range(int(minimum - slack), int(maximum + slack) + 1), 'r')
 
     axHistx.hist(s1.dropna(), bins=binCenters, fc = 'black', label = 'Observed')
     axHisty.hist(s2.dropna(), bins=binCenters, orientation='horizontal', label = 'Predicted')
