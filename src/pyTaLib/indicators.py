@@ -9,13 +9,13 @@ def SMA(df, column, n):
     ----------
     df : pandas.DataFrame object
     column : string, DataFrame column desired for calculation of moving average
-    n : int, length of moving average
+    n : int, lenght of moving average
 
     Returns
     ----------
     SMA_[n] : pandas.Series, simple moving average (values before [n] samples will be NaN)
     """
-    return Series(rolling_mean(df[column], n), name = column + '_SMA' + str(n))
+    return Series(df[column].rolling(window = n, center = False).mean(), name = column + '_SMA' + str(n))
 
 #Exponential Moving Average
 def EMA(df, column, n):
@@ -24,7 +24,7 @@ def EMA(df, column, n):
     ----------
     df : pandas.DataFrame object
     column : string, DataFrame column desired for calculation of moving average
-    n : int, length of moving average
+    n : int, lenght of moving average
 
     Returns
     ----------
@@ -63,7 +63,7 @@ def BBANDS(df, n = 20):
     Parameters
     ----------
     df : pandas.DataFrame object ('Close' colum assumed to be present)
-    n : int, length of moving average, default 20
+    n : int, lenght of moving average, default 20
 
     Returns
     ----------
@@ -71,14 +71,14 @@ def BBANDS(df, n = 20):
                 - BollingerMA_[n]: simple moving average of [n] periods
                 - BollingerUpper_[n]: upper band limit (MA + 2 * STD)
                 - BollingerLower_[n]: lower band limit (MA - 2 * STD)
-                - Bollinger%b_[n]: relative position of Close to band limits (0 = lower, .5 = MA, 1 = upper)
+                - Bollinger%b_[n]: relative position of Close to band limits (-1 = lower, 0 = MA, 1 = upper)
     """
-    MA = Series(rolling_mean(df['Close'], n))
-    MSD = Series(rolling_std(df['Close'], n))
+    MA = df['Close'].rolling(window = n, center = False).mean()
+    MSD = df['Close'].rolling(window = n, center = False).std()
     BMA = Series(MA, name = 'BollingerMA_' + str(n))
     BUp = Series(BMA + 2 * MSD, name = 'BollingerUpper_' + str(n))
     BLow = Series(BMA - 2 * MSD, name = 'BollingerLower_' + str(n))
-    bp = (df['Close'] - (MA - 2 * MSD)) / (4 * MSD)
+    bp = (df['Close'] - MA) / (2 * MSD)
     Bp = Series(bp, name = 'Bollinger%b_' + str(n))
     BB = concat([BMA, BUp, BLow, Bp], axis = 1)
     return BB
@@ -162,9 +162,9 @@ def MACD(df, n_fast = 12, n_slow = 26, n_signal = 9):
     Parameters
     ----------
     df : pandas.DataFrame object ('Close' colum assumed to be present)
-    n_fast : int, length of fast moving average, default 12
-    n_slow : int, length of slow moving average, default 26
-    n_signal : int, length of signal moving average, default 9
+    n_fast : int, lenght of fast moving average, default 12
+    n_slow : int, lenght of slow moving average, default 26
+    n_signal : int, lenght of signal moving average, default 9
 
     Returns
     ----------
@@ -175,9 +175,9 @@ def MACD(df, n_fast = 12, n_slow = 26, n_signal = 9):
     """
     EMAfast = Series(Series.ewm(df['Close'], span = n_fast, min_periods = n_slow - 1).mean())
     EMAslow = Series(Series.ewm(df['Close'], span = n_slow, min_periods = n_slow - 1).mean())
-    MACD = Series(EMAfast - EMAslow, name = 'MACD_' + str(n_fast) + '_' + str(n_slow))
-    MACDsign = Series(Series.ewm(MACD, span = n_signal, min_periods = n_signal - 1).mean(), name = 'MACDsignal_' + str(n_fast) + '_' + str(n_slow))
-    MACDdiff = Series(MACD - MACDsign, name = 'MACDdiff_' + str(n_fast) + '_' + str(n_slow))
+    MACD = Series(EMAfast - EMAslow, name = 'MACD_{}_{}_{}'.format(n_fast, n_slow, n_signal))
+    MACDsign = Series(Series.ewm(MACD, span = n_signal, min_periods = n_signal - 1).mean(), name = 'MACDsignal_{}_{}_{}'.format(n_fast, n_slow, n_signal))
+    MACDdiff = Series(MACD - MACDsign, name = 'MACDdiff_{}_{}_{}'.format(n_fast, n_slow, n_signal))
     macd = pandas.concat([MACD, MACDsign, MACDdiff], axis = 1)
     return macd
 
@@ -298,22 +298,31 @@ def MFI(df, n):
     return MFI
 
 #On-balance Volume
-def OBV(df, n):
-    index = df.index.values
-    df.reset_index()
-    i = 0
-    OBV = [0]
-    while i < df.index[-1]:
-        if df.get_value(i + 1, 'Close') - df.get_value(i, 'Close') > 0:
-            OBV.append(df.get_value(i + 1, 'Volume'))
-        if df.get_value(i + 1, 'Close') - df.get_value(i, 'Close') == 0:
-            OBV.append(0)
-        if df.get_value(i + 1, 'Close') - df.get_value(i, 'Close') < 0:
-            OBV.append(-df.get_value(i + 1, 'Volume'))
-        i = i + 1
-    OBV = Series(OBV)
-    OBV_ma = Series(rolling_mean(OBV, n), index = index, name = 'OBV_' + str(n))
-    return OBV_ma
+def OBV(df, n = None):
+    """ On Balance Volume
+    Parameters
+    ----------
+    df : pandas.DataFrame object ('Close' and 'Volume' colum assumed to be present)
+    n : int, lenght of moving average, default None
+
+    Returns
+    ----------
+    OBV : pandas.DataFrame, containing the columns (where [n] is the given input):
+                - OBV: On Balance Volume
+                - OBV[n]: simple n-sample moving average of OBV, if n is given
+    """
+    OBV = [np.nan]
+    i = 1
+    while i < len(df):
+        signal = sign(df.get_value(df.index[i], 'Close') - df.get_value(df.index[i - 1], 'Close'))
+        OBV.append(signal * df.get_value(df.index[i], 'Volume'))
+        i += 1
+    OBV = Series(OBV, index = df.index, name = 'OBV').cumsum()
+    if n:
+        OBV_ma = Series(OBV.rolling(window = n, center = False).mean(), name = 'OBV{}'.format(n))
+        return concat([OBV, OBV_ma], axis = 1)
+    else:
+        return OBV
 
 #Force Index
 def FORCE(df, n):
@@ -386,4 +395,6 @@ def DONCH(df, n):
 
 #Standard Deviation
 def STDDEV(df, column, n):
-    return Series(rolling_std(df[column], n), name = column + '_STD_' + str(n))
+    return Series(df[column].rolling(window = n, center = False).std(), name = column + '_STD' + str(n))
+
+sign = lambda a: int(a>0) - int(a<0)

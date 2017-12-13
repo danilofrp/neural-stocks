@@ -39,15 +39,22 @@ plt.rcParams['ytick.labelsize'] = 13
 # </editor-fold>
 
 # <editor-fold> workspace
+
 df = acquireData(filePath = filePath,
                  replicateForHolidays = True,
-                 meanStdLen = 25,
+                 meanStdLen = 20,
                  returnCalcParams = [['Close'], ['Close', 'Open']],
-                 EMAparams = [('Close', 17), ('Close', 72), ('Volume', 21)],
+                 EMAparams = [{'column': 'Close', 'lenght': 17}, {'column': 'Close', 'lenght': 72}, {'column': 'Volume', 'lenght': 21}],
+                 MACDParams = [{'fast_lenght': 12, 'slow_lenght': 26, 'signal_lenght': 9}],
+                 BBParams = [{'lenght': 20}],
+                 OBVParams = [{'lenght': None}],
+                 deTrendParams = {'column': 'Close', 'window': 10, 'model': decomposeModel, 'weightModel': 'window_acorr', 'weightModelWindow': 25},
+                 colPrefix = None,
                  dropNan = False)
-df.tail(10)
+df.tail(1)
+df.columns.values
 
-plotSeries(df['Close'], asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotSeries([df['Close'], df['Close_trend']], title = None, initialPlotDate = '2017', finalPlotDate = '2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 plotReturnSeries(df, column = 'Close', asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -95,9 +102,9 @@ plotCrosscorrelation(df['Close_returns'], df['Close_EMA72_logdiff'], 50, saveImg
 histogram([df['Close'], df['Close_trend']], colors = ['b', 'r'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
-deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'full_pgram', weightModelWindow = None)
+deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weightModel = 'full_acorr', weightModelWindow = None)
 ax.plot(df['Close_trend'], df['Close'], 'bo')
-deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = 25)
+deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = 25)
 ax.plot(df['Close_trend'], df['Close'], 'ro', alpha=0.5)
 
 scatterHist(df['Close'], df['Close_trend'], nBins = 100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
@@ -190,3 +197,11 @@ fig, ax = plt.subplots(figsize=(10,10))
 plt.imshow(RSS[2:,:], cmap="jet", extent=[2, windowMaxSize, 0, maxFreq], aspect="auto")
 cbar = plt.colorbar()
 # </editor-fold>
+
+
+
+def teste(params):
+    print params['t3']
+t = {'t1':1, 't2':2, 't3':'pudim'}
+
+teste(t)

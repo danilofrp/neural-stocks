@@ -4,12 +4,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
-from statsmodels.tsa import stattools
+from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
 from scipy import signal
 from neuralstocks.utils import *
 
-def plotSeries(s, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     """
     Plots the desired Series
 
@@ -29,17 +29,22 @@ def plotSeries(s, asset, initialPlotDate = '', finalPlotDate = '', saveImg = Fal
 
     saveFormat : string, saved image format. Default '.pdf'
     """
-    initialPlotDate = initialPlotDate if initialPlotDate else s.index[0]
-    finalPlotDate = finalPlotDate if finalPlotDate else s.index[-1]
-    title = '{} {} ({})'.format(asset, s.name, initialPlotDate.strftime('%d/%m/%Y')) if initialPlotDate == finalPlotDate else '{} {} ({} to {})'.format(asset, s.name, initialPlotDate.strftime('%d/%m/%Y'), finalPlotDate.strftime('%d/%m/%Y'))
+    series = [series] if isinstance(series, pd.Series) else series
+    initialPlotDate = series[0][initialPlotDate].index[0] if initialPlotDate else series[0].index[0]
+    finalPlotDate = series[0][finalPlotDate].index[-1] if finalPlotDate else series[0].index[-1]
+    if not title:
+        title = '{} ({})'.format(series[0].name, initialPlotDate.strftime('%d/%m/%Y')) if initialPlotDate == finalPlotDate else '{} ({} to {})'.format(series[0].name, initialPlotDate.strftime('%d/%m/%Y'), finalPlotDate.strftime('%d/%m/%Y'))
+    if not ylabel:
+        ylabel = series[0].name
 
     fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1)
     fig.suptitle(title)
     ax.set_xlabel('Date')
-    ax.set_ylabel('Price')
-    ax.plot(s[initialPlotDate:finalPlotDate])
+    ax.set_ylabel(ylabel)
+    for s in series:
+        ax.plot(s[initialPlotDate:finalPlotDate])
     if saveImg:
-        saveName = saveName if saveName else '{}'.format(s.name)
+        saveName = saveName if saveName else '{}'.format(s[0].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
 def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
@@ -113,7 +118,7 @@ def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, s
     if weightModel == 'pgram':
         weights = list(reversed(signal.periodogram(s[offset - 4 * window - 1 : offset].dropna())[1][1 : window + 1]))
     elif weightModel == 'acorr':
-        weights = list(reversed(np.abs(stattools.acf(s[offset - window - 1: offset].dropna(), nlags= window + 1))[1 : window + 1]))
+        weights = list(reversed(np.abs(autocorrelation(s[offset - window - 1: offset].dropna(), nlags= window + 1))[1 : window + 1]))
     else:
         weights = None
     a = np.polyfit(x, y, deg = 1, w = weights)
@@ -167,21 +172,7 @@ def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow,
         saveName = saveName if saveName else '{}_deTrend'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotPeriodogramStats(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
-    pgram = stattools.periodogram(s.dropna())
-    plotEnd = plotEnd if plotEnd else len(s.dropna())/2
-
-    fig, ax = plt.subplots(figsize=(10,5), nrows = 1, ncols = 1, sharex = True)
-    fig.suptitle('Periodogram')
-    # ax.set_xlabel('Period (samples)')
-    if yLog:
-        plt.yscale('log')
-    ax.stem(range(plotInit,plotEnd+1), pgram[plotInit:plotEnd+1])
-    if saveImg:
-        saveName = saveName if saveName else '{}_periodogram'.format(s.name)
-        fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
-
-def plotPeriodogramSciPy(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     f, Pxx = signal.periodogram(s.dropna())
     plotEnd = plotEnd if plotEnd else len(s.dropna())/2
 
@@ -199,7 +190,7 @@ def plotFFT(s, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'
     Fs = 1.0;  # sampling rate
     Ts = 1.0/Fs; # sampling interval
     y = s.dropna() - 1 if s.dropna().mean() > 0.5 else s.dropna()
-    n = len(y) # length of the signal
+    n = len(y) # lenght of the signal
     k = np.arange(n)
     T = n/Fs
     frq = k/T # two sides frequency range
@@ -256,35 +247,17 @@ def plotSeasonalDecompose(s, asset, frequency = 1, initialPlotDate = '', finalPl
         saveName = saveName if saveName else '{}_seasonalDecompose'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotAcf(s, lags = 10, partialAcf = False, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
-    lag_acf = stattools.acf(s.dropna(), nlags=lags)
-    if partialAcf:
-        lag_pacf = stattools.pacf(s.dropna(), nlags=lags, method='ols')
+def plotAcf(s, lags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+    lag_acf = autocorrelation(s, nlags=lags)
 
-    fig, ax = plt.subplots(figsize=(20 if partialAcf else 10,10), nrows = 1, ncols = 2 if partialAcf else 1)
-    if not partialAcf:
-        #Plot ACF:
-        ax.set_title('Autocorrelation Function')
-        ax.set_xlabel('Lags')
-        ax.stem(range(1,len(lag_acf)),lag_acf[1:])
-        ax.axhline(y=0,linestyle='--',color='gray')
-        ax.axhline(y=-7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        ax.axhline(y=7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-    else:
-        #Plot ACF:
-        ax[0].set_title('Autocorrelation Function')
-        ax[0].set_xlabel('Lags')
-        ax[0].stem(range(1,len(lag_acf)),lag_acf[1:])
-        ax[0].axhline(y=0,linestyle='--',color='gray')
-        ax[0].axhline(y=-7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        ax[0].axhline(y=7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        #Plot PACF:
-        ax[1].set_title('Partial Autocorrelation Function')
-        ax[1].set_xlabel('Lags')
-        ax[1].stem(range(1,len(lag_pacf)),lag_pacf[1:])
-        ax[1].axhline(y=0,linestyle='--',color='gray')
-        ax[1].axhline(y=-7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
-        ax[1].axhline(y=7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
+    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1)
+    #Plot ACF:
+    ax.set_title('Autocorrelation Function')
+    ax.set_xlabel('Lags')
+    ax.stem(range(1,len(lag_acf)),lag_acf[1:])
+    ax.axhline(y=0,linestyle='--',color='gray')
+    ax.axhline(y=-7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
+    ax.axhline(y=7.96/np.sqrt(len(s.dropna())),linestyle='--',color='gray')
 
     if saveImg:
         saveName = saveName if saveName else '{}_acf'.format(s.name)
@@ -308,7 +281,7 @@ def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg =
 
     #Perform Dickey-Fuller test:
     #print 'Results of Dickey-Fuller Test:'
-    dftest = stattools.adfuller(ts.dropna(), autolag='AIC')
+    dftest = adfuller(ts.dropna(), autolag='AIC')
     dfoutput = pd.Series(dftest[0:4], index=['Test Statistic','p-value','#Lags Used','Number of Observations Used'])
     for key,value in dftest[4].items():
         dfoutput['Critical Value (%s)'%key] = value
@@ -331,7 +304,7 @@ def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveNa
     """Cross correlations calculatins until nlags.
     Parameters
     ----------
-    x, y : pandas.Series objects of equal length
+    x, y : pandas.Series objects of equal lenght
     nlags : int, number of lags to calculate cross-correlation, default 10
     saveImg : bool, saves image to save directory if True, default False
     saveIndex: string, sufix to add to saved image file name, default empty

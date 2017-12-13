@@ -3,14 +3,13 @@ sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
 from pandas.core.nanops import nanmean as pd_nanmean
 from scipy.signal import periodogram
-from statsmodels.tsa.stattools import acf
 
 def getWeights(s, window, weightModel, weightModelWindow):
     if weightModel == 'full_pgram':
         weights = list(reversed(periodogram(s.dropna())[1][1 : window + 1]))
         weightModelWindow = weightModelWindow if weightModelWindow else window
     elif weightModel == 'full_acorr':
-        weights = list(reversed(np.abs(acf(s.dropna(), nlags= window + 1))[1 : window + 1]))
+        weights = list(reversed(np.abs(autocorrelation(s, nlags = window))[1 : window + 1]))
         weightModelWindow = weightModelWindow if weightModelWindow else window
     elif weightModel == 'window_pgram':
         weightModelWindow = weightModelWindow if weightModelWindow and (weightModelWindow >= 2 * window) else 2 * window
@@ -20,7 +19,7 @@ def getWeights(s, window, weightModel, weightModelWindow):
             weights = None
     elif weightModel == 'window_acorr':
         weightModelWindow = weightModelWindow if weightModelWindow else window
-        weights = list(reversed(np.abs(acf(s.dropna(), nlags= window + 1))[1 : window + 1]))
+        weights = list(reversed(np.abs(autocorrelation(s, nlags = window))[1 : window + 1]))
         if np.isnan(weights).all() or not checkIfTwoOrMoreValuesAreNotZero(weights):
             weightModelWindow = window
             weights = None
@@ -52,7 +51,7 @@ def crosscorrelation(x, y, nlags = 0):
     """Cross correlations calculatins until nlags.
     Parameters
     ----------
-    x, y : pandas.Series objects of equal length
+    x, y : pandas.Series objects of equal lenght
     nlags : int, number of lags to calculate cross-correlation, default 0
 
     Returns
@@ -60,6 +59,19 @@ def crosscorrelation(x, y, nlags = 0):
     crosscorrelation : [float]
     """
     return [x.corr(y.shift(lag)) for lag in range(nlags + 1)]
+
+def autocorrelation(x, nlags = 0):
+    """Autocorrelation calculatins until nlags.
+    Parameters
+    ----------
+    x: pandas.Series object
+    nlags : int, number of lags to calculate cross-correlation, default 0
+
+    Returns
+    ----------
+    autocorrelation : [float]
+    """
+    return [x.corr(x.shift(lag)) for lag in range(nlags + 1)]
 
 def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
     maximum = max(p.dropna().max(), q.dropna().max())
@@ -77,3 +89,5 @@ def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
             else:
                 kl_values = np.append(kl_values,kl_value)
     return np.sum(kl_values)
+
+sign = lambda a: int(a>0) - int(a<0)
