@@ -15,7 +15,10 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
 
     Parameters
     ----------
-    s : pandas.Series object
+    series : pandas.Series object, pandas.Series array, or pandas.DataFrame object.
+        Will plot the single Series if input is a single pandas.Series, plot all
+        Series if input is an array of pandas.Series, or plot all dataframe columns
+        if input is a pandas.DataFrame object. All plots will overlap in the same ax
 
     initialPlotDate, finalPlotDate : string (yyyy or yyyy-mm) or datetime,
     indicates which period of the series to plot. If none is provided, assumes
@@ -29,6 +32,8 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
 
     saveFormat : string, saved image format. Default 'pdf'
     """
+    if isinstance(series, pd.DataFrame):
+        series = [series[column] for column in series.columns.values]
     series = [series] if isinstance(series, pd.Series) else series
     initialPlotDate = series[0][initialPlotDate].index[0] if initialPlotDate else series[0].index[0]
     finalPlotDate = series[0][finalPlotDate].index[-1] if finalPlotDate else series[0].index[-1]
@@ -157,12 +162,11 @@ def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow,
     else:
         ax[1].set_title('Trend Estimation')
         ax[1].plot(df[trendName][initialPlotDate:finalPlotDate])
-    signal = '/' if model.startswith('m') else '-'
-    ax[1 + int(not overlap)].set_title('Observed {} Trend'.format(signal))
+    ax[1 + int(not overlap)].set_title('Residuals')
     ax[1 + int(not overlap)].plot(df[residName][initialPlotDate:finalPlotDate])
 
     if detailed:
-        plt.figtext(0.1,  0.010, 'deTrend Parameters', size = 14, verticalalignment = 'center')
+        plt.figtext(0.1,  0.010, 'deTrend Parameters:', size = 14, verticalalignment = 'center')
         plt.figtext(0.1, -0.025, 'Model: {}'.format(model), size = 14)
         plt.figtext(0.1, -0.050, 'Window size: {}'.format(window), size = 14)
         plt.figtext(0.1, -0.075, 'Weight model: {}'.format(weightModel), size = 14)

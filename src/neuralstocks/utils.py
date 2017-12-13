@@ -18,7 +18,7 @@ def getWeights(s, window, weightModel, weightModelWindow):
             weightModelWindow = window
             weights = None
     elif weightModel == 'window_acorr':
-        weightModelWindow = weightModelWindow if weightModelWindow else window
+        weightModelWindow = weightModelWindow if weightModelWindow and (weightModelWindow >= window + 2) else window + 2
         weights = list(reversed(np.abs(autocorrelation(s, nlags = window))[1 : window + 1]))
         if np.isnan(weights).all() or not checkIfTwoOrMoreValuesAreNotZero(weights):
             weightModelWindow = window
@@ -38,7 +38,7 @@ def checkIfTwoOrMoreValuesAreNotZero(x):
     return False
 
 def predict(x, y, fitOrder, weights, window):
-    a = np.polyfit(x, y, deg = fitOrder, w = weights);
+    a = np.polyfit(x, y, deg = fitOrder, w = weights)
     prediction = 0
     for j in range(fitOrder, -1, -1):
         prediction += a[fitOrder - j]*(window**j)

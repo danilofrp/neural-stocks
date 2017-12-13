@@ -48,7 +48,7 @@ df = acquireData(filePath = filePath,
                  MACDParams = [{'fast_lenght': 12, 'slow_lenght': 26, 'signal_lenght': 9}],
                  BBParams = [{'lenght': 20}],
                  OBVParams = [{'lenght': None}],
-                 deTrendParams = {'column': 'Close', 'window': 10, 'model': decomposeModel, 'weightModel': 'window_acorr', 'weightModelWindow': 25},
+                 #deTrendParams = {'column': 'Close', 'window': 10, 'model': decomposeModel, 'weightModel': 'window_acorr', 'weightModelWindow': 25},
                  colPrefix = None,
                  dropNan = False)
 df.tail(1)
@@ -76,9 +76,9 @@ deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1,
 
 deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'full_pgram', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'window_pgram', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'window_pgram', weightModelWindow = 100 saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'window_acorr', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+deTrendRMSE(df, column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 10, weightModel = 'window_acorr', weightModelWindow = 25, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 deSeasonRMSE(df, column = 'Close', model = decomposeModel, maxFreq = 75, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -95,7 +95,7 @@ plotSeasonalDecompose(df['Close'],  asset = asset, frequency=5, initialPlotDate=
 
 testStationarity(df['Close_resid'], window=25, initialPlotDate='', finalPlotDate='', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-plotAcf(df['Close'][:'2008'][-20:], lags = 40, partialAcf = False, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotAcf(df['Close'][:4000][-27:], lags = 25, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 plotCrosscorrelation(df['Close_returns'], df['Close_EMA72_logdiff'], 50, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
