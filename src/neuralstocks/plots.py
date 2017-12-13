@@ -9,7 +9,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from scipy import signal
 from neuralstocks.utils import *
 
-def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """
     Plots the desired Series
 
@@ -27,7 +27,7 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
 
     saveName : string, set of desired lenghts to calculate moving averages
 
-    saveFormat : string, saved image format. Default '.pdf'
+    saveFormat : string, saved image format. Default 'pdf'
     """
     series = [series] if isinstance(series, pd.Series) else series
     initialPlotDate = series[0][initialPlotDate].index[0] if initialPlotDate else series[0].index[0]
@@ -47,7 +47,7 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
         saveName = saveName if saveName else '{}'.format(s[0].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """
     Plots the desired Series, along with its return series. Return series asssumed to be present in DataFrame.
 
@@ -67,7 +67,7 @@ def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = ''
 
     saveName : string, set of desired lenghts to calculate moving averages
 
-    saveFormat : string, saved image format. Default '.pdf'
+    saveFormat : string, saved image format. Default 'pdf'
     """
     initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
     finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
@@ -90,7 +90,7 @@ def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = ''
         saveName = saveName if saveName else '{}_returns'.format(column)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """
     Plots a demonstration of the mehtod used to extract trend
 
@@ -111,7 +111,7 @@ def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, s
 
     saveName : string, set of desired lenghts to calculate moving averages
 
-    saveFormat : string, saved image format. Default '.pdf'
+    saveFormat : string, saved image format. Default 'pdf'
     """
     x = range(0, window)
     y = s[offset : offset + window].values
@@ -141,7 +141,7 @@ def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, s
 
 def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow, RMSE,
                       initialPlotDate = None, finalPlotDate = None, overlap = False, detailed = False,
-                      saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+                      saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     trendName = column + '_trend'
     residName = column + '_resid'
     initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
@@ -172,7 +172,7 @@ def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow,
         saveName = saveName if saveName else '{}_deTrend'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     f, Pxx = signal.periodogram(s.dropna())
     plotEnd = plotEnd if plotEnd else len(s.dropna())/2
 
@@ -186,7 +186,7 @@ def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = Fal
         saveName = saveName if saveName else '{}_periodogram'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotFFT(s, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotFFT(s, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     Fs = 1.0;  # sampling rate
     Ts = 1.0/Fs; # sampling interval
     y = s.dropna() - 1 if s.dropna().mean() > 0.5 else s.dropna()
@@ -210,7 +210,7 @@ def plotFFT(s, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'
         saveName = saveName if saveName else '{}_FFT'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotSeasonalDecompose(s, asset, frequency = 1, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotSeasonalDecompose(s, asset, frequency = 1, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     s = s.dropna()
     initialPlotDate = initialPlotDate if initialPlotDate else s.index[0]
     finalPlotDate = finalPlotDate if finalPlotDate else s.index[-1]
@@ -247,7 +247,7 @@ def plotSeasonalDecompose(s, asset, frequency = 1, initialPlotDate = '', finalPl
         saveName = saveName if saveName else '{}_seasonalDecompose'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotAcf(s, lags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotAcf(s, lags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     lag_acf = autocorrelation(s, nlags=lags)
 
     fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1)
@@ -263,7 +263,7 @@ def plotAcf(s, lags = 10, saveImg = False, saveDir = '', saveName = '', saveForm
         saveName = saveName if saveName else '{}_acf'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     initialPlotDate = initialPlotDate if initialPlotDate else ts.index[0]
     finalPlotDate = finalPlotDate if finalPlotDate else ts.index[-1]
 
@@ -300,7 +300,7 @@ def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg =
         saveName = saveName if saveName else '{}_ADF'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """Cross correlations calculatins until nlags.
     Parameters
     ----------
@@ -323,7 +323,7 @@ def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveNa
         saveName = saveName if saveName else '{}_{}_crossCorr'.format(x, y)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def histogram(series, colors, nBins, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def histogram(series, colors, nBins, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     maximum = minimum = series[0].dropna().mean()
     for s in series:
         maximum = s.dropna().max() if s.dropna().max() > maximum else maximum
@@ -345,7 +345,7 @@ def histogram(series, colors, nBins, saveImg = False, saveDir = '', saveName = '
             saveName = saveName if saveName else '{}_hist'.format(series[1].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     nullfmt = NullFormatter()
 
     left, width = 0.1, 0.65
