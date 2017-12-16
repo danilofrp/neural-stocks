@@ -92,7 +92,7 @@ def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
 
 sign = lambda a: int(a>0) - int(a<0)
 
-def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
+def prepData2(df, columnsToUse, columnToPredict, nDelays, testSetSize):
     xTrain = []
     yTrain = []
     xTest = []
@@ -102,17 +102,15 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
         yTrainAux = []
         xTestAux = []
         yTestAux = []
-        if i >= nDelays and i < testSetSize:
+        if i >= nDelays and (i < (len(df) - testSetSize)):
             for column in columnsToUse:
-                if i < testSetSize:
-                    xTrainAux.extend(df[column][i - nDelays : i])
+                xTrainAux.extend(df[column][i - nDelays : i])
             yTrainAux.append(df[columnToPredict][i])
             xTrain.append(xTrainAux)
             yTrain.append(yTrainAux)
-        if i >= nDelays and i >= testSetSize:
+        elif i >= nDelays and (i >= (len(df) - testSetSize)):
             for column in columnsToUse:
-                if i < testSetSize:
-                    xTestAux.extend(df[column][i - nDelays : i])
+                xTestAux.extend(df[column][i - nDelays : i])
             yTestAux.append(df[columnToPredict][i])
             xTest.append(xTestAux)
             yTest.append(yTestAux)
