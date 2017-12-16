@@ -92,7 +92,7 @@ def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
 
 sign = lambda a: int(a>0) - int(a<0)
 
-def prepData2(df, columnsToUse, columnToPredict, nDelays, testSetSize):
+def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
     xTrain = []
     yTrain = []
     xTest = []
