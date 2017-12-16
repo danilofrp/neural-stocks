@@ -1,5 +1,9 @@
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 import sys, os
 sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
