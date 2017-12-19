@@ -115,4 +115,4 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
             xTest.append(xTestAux)
             yTest.append(yTestAux)
 
-    return xTrain, yTrain, xTest, yTest
+    return np.array(xTrain), np.array(yTrain), np.array(xTest), np.array(yTest)
