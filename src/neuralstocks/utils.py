@@ -104,13 +104,19 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
         yTestAux = []
         if i >= nDelays and (i < (len(df) - testSetSize)):
             for column in columnsToUse:
-                xTrainAux.extend(df[column][i - nDelays : i])
+                if column == columnToPredict:
+                    xTrainAux.extend(df[column][i - nDelays : i])
+                else:
+                    xTrainAux.extend(df[column][i - 1 : i])
             yTrainAux.append(df[columnToPredict][i])
             xTrain.append(xTrainAux)
             yTrain.append(yTrainAux)
         elif i >= nDelays and (i >= (len(df) - testSetSize)):
             for column in columnsToUse:
-                xTestAux.extend(df[column][i - nDelays : i])
+                if column == columnToPredict:
+                    xTestAux.extend(df[column][i - nDelays : i])
+                else:
+                    xTestAux.extend(df[column][i - 1 : i])
             yTestAux.append(df[columnToPredict][i])
             xTest.append(xTestAux)
             yTest.append(yTestAux)
