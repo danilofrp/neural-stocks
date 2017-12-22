@@ -13,7 +13,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from scipy import signal
 from neuralstocks.utils import *
 
-def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
+def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', plotZeroLine = False, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """
     Plots the desired Series
 
@@ -52,6 +52,8 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
     ax.set_ylabel(ylabel)
     for s in series:
         ax.plot(s[initialPlotDate:finalPlotDate])
+    if plotZeroLine:
+        ax.axhline(y=0,linestyle='--',color='gray')
     if saveImg:
         saveName = saveName if saveName else '{}'.format(s[0].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
