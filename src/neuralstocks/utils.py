@@ -106,6 +106,11 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
             for column in columnsToUse:
                 if column == columnToPredict:
                     xTrainAux.extend(df[column][i - nDelays : i])
+                elif 'Holiday' in column:
+                    if df[column][i : i + 1].empty:
+                        xTrainAux.extend([0])
+                    else:
+                        xTrainAux.extend(df[column][i : i + 1])
                 else:
                     xTrainAux.extend(df[column][i - 1 : i])
             yTrainAux.append(df[columnToPredict][i])
@@ -115,6 +120,11 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
             for column in columnsToUse:
                 if column == columnToPredict:
                     xTestAux.extend(df[column][i - nDelays : i])
+                elif 'Holiday' in column:
+                    if df[column][i : i + 1].empty:
+                        xTestAux.extend([0])
+                    else:
+                        xTestAux.extend(df[column][i : i + 1])
                 else:
                     xTestAux.extend(df[column][i - 1 : i])
             yTestAux.append(df[columnToPredict][i])
