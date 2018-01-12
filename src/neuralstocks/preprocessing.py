@@ -231,9 +231,9 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
         print('Running deTrend ({})'.format(i), end='\r')
         deTrend(df2, column = column, window = i, model = model, fitOrder = fitOrder, weightModel = weightModel, weightModelWindow = weightModelWindow)
         if model == 'multiplicative':
-            RMSE[i] = (np.square((df2['{}_resid'.format(column)].dropna() - 1)).sum())/(len(df2.dropna()))
+            RMSE[i] = np.sqrt(np.square((df2['{}_resid'.format(column)].dropna() - 1)).sum()/(len(df2.dropna())))
         else:
-            RMSE[i] = (np.square(df2['{}_resid'.format(column)].dropna()).sum())/(len(df2.dropna()))
+            RMSE[i] = np.sqrt(np.square(df2['{}_resid'.format(column)].dropna()).sum()/(len(df2.dropna())))
     fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
     ax.set_title('DeTrend RMSE per window size ({} model)'.format(model), fontsize = 20, fontweight = 'bold')
     ax.set_xlabel('Window size')
