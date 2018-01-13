@@ -161,14 +161,17 @@ def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow,
     plt.xlabel('Date')
     title = 'Observed and Predicted' if overlap else 'Observed'
     ax[0].set_title(title)
+    ax[0].set_ylabel('BRL')
     ax[0].plot(df[column][initialPlotDate:finalPlotDate])
     if overlap:
         ax[0].plot(df[trendName][initialPlotDate:finalPlotDate], 'r')
         ax[0].legend()
     else:
         ax[1].set_title('Trend Estimation')
+        ax[1].set_ylabel('BRL')
         ax[1].plot(df[trendName][initialPlotDate:finalPlotDate])
     ax[1 + int(not overlap)].set_title('Residuals')
+    ax[1 + int(not overlap)].set_ylabel('Error (BRL)')
     ax[1 + int(not overlap)].plot(df[residName][initialPlotDate:finalPlotDate])
 
     if detailed:
@@ -196,7 +199,7 @@ def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = Fal
         saveName = saveName if saveName else '{}_periodogram'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
-def plotFFT(s, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
+def plotFFT(s, saveImg = False, title = 'FFT', saveDir = '', saveName = '', saveFormat = 'pdf'):
     Fs = 1.0;  # sampling rate
     Ts = 1.0/Fs; # sampling interval
     y = s.dropna() - 1 if s.dropna().mean() > 0.5 else s.dropna()
@@ -210,6 +213,7 @@ def plotFFT(s, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf')
     Y = Y[range(n/2)]
 
     fig, ax = plt.subplots(2, 1, figsize=(15,10))
+    ax[0].set_title(title)
     ax[0].plot(y)
     ax[0].set_xlabel('Time')
     ax[0].set_ylabel('Amplitude')

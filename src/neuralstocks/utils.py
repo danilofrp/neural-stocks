@@ -3,6 +3,7 @@ sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
 from pandas.core.nanops import nanmean as pd_nanmean
 from scipy.signal import periodogram
+from sklearn.model_selection import train_test_split
 
 def getWeights(s, window, weightModel, weightModelWindow):
     if weightModel == 'full_pgram':
@@ -92,7 +93,7 @@ def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
 
 sign = lambda a: int(a>0) - int(a<0)
 
-def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
+def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize, validationSplitSize = None):
     xTrain = []
     yTrain = []
     xTest = []
@@ -131,4 +132,8 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize):
             xTest.append(xTestAux)
             yTest.append(yTestAux)
 
-    return np.array(xTrain), np.array(yTrain), np.array(xTest), np.array(yTest)
+    if not validationSplitSize:
+        return np.array(xTrain), np.array(yTrain), np.array(xTest), np.array(yTest)
+    else:
+        xTrain, xVal, yTrain, yVal = train_test_split(xTrain, yTrain, test_size = validationSplitSize)
+        return np.array(xTrain), np.array(yTrain), np.array(xVal), np.array(yVal), np.array(xTest), np.array(yTest)
