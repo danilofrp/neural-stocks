@@ -57,6 +57,7 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
     if saveImg:
         saveName = saveName if saveName else '{}'.format(s[0].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """
@@ -100,6 +101,7 @@ def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = ''
     if saveImg:
         saveName = saveName if saveName else '{}_returns'.format(column)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """
@@ -149,6 +151,7 @@ def plotLinearFit (s, window, offset = 0, weightModel = None, saveImg = False, s
     if saveImg:
         saveName = saveName if saveName else 'linearFitExample'
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow, RMSE,
                       initialPlotDate = None, finalPlotDate = None, overlap = False, detailed = False,
@@ -184,6 +187,7 @@ def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow,
     if saveImg:
         saveName = saveName if saveName else '{}_deTrend'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     f, Pxx = signal.periodogram(s.dropna())
@@ -198,6 +202,7 @@ def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = Fal
     if saveImg:
         saveName = saveName if saveName else '{}_periodogram'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotFFT(s, saveImg = False, title = 'FFT', saveDir = '', saveName = '', saveFormat = 'pdf'):
     Fs = 1.0;  # sampling rate
@@ -223,6 +228,7 @@ def plotFFT(s, saveImg = False, title = 'FFT', saveDir = '', saveName = '', save
     if saveImg:
         saveName = saveName if saveName else '{}_FFT'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotSeasonalDecompose(s, asset, frequency = 1, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     s = s.dropna()
@@ -260,6 +266,7 @@ def plotSeasonalDecompose(s, asset, frequency = 1, initialPlotDate = '', finalPl
     if saveImg:
         saveName = saveName if saveName else '{}_seasonalDecompose'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotAcf(s, lags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     lag_acf = autocorrelation(s, nlags=lags)
@@ -276,6 +283,7 @@ def plotAcf(s, lags = 10, saveImg = False, saveDir = '', saveName = '', saveForm
     if saveImg:
         saveName = saveName if saveName else '{}_acf'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     initialPlotDate = initialPlotDate if initialPlotDate else ts.index[0]
@@ -313,6 +321,7 @@ def testStationarity(ts, window, initialPlotDate='', finalPlotDate='', saveImg =
     if saveImg:
         saveName = saveName if saveName else '{}_ADF'.format(s.name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     """Cross correlations calculatins until nlags.
@@ -336,6 +345,7 @@ def plotCrosscorrelation(x, y, nlags = 10, saveImg = False, saveDir = '', saveNa
     if saveImg:
         saveName = saveName if saveName else '{}_{}_crossCorr'.format(x, y)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def histogram(series, colors, nBins, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     maximum = minimum = series[0].dropna().mean()
@@ -358,6 +368,7 @@ def histogram(series, colors, nBins, saveImg = False, saveDir = '', saveName = '
         else:
             saveName = saveName if saveName else '{}_hist'.format(series[1].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
 
 def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
     nullfmt = NullFormatter()
@@ -401,3 +412,4 @@ def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', sav
     if saveImg:
         saveName = saveName if saveName else '{}_{}_scatterHist'.format(s1, s2)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+    return fig, ax
