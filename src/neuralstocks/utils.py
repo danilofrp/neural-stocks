@@ -137,3 +137,7 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize, validation
     else:
         xTrain, xVal, yTrain, yVal = train_test_split(xTrain, yTrain, test_size = validationSplitSize)
         return np.array(xTrain), np.array(yTrain), np.array(xVal), np.array(yVal), np.array(xTest), np.array(yTest)
+
+def reconstructReturns(observed, predictedReturns):
+    predicted = observed.shift() * np.exp(predictedReturns)
+    return predicted
