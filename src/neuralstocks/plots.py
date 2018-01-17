@@ -7,6 +7,7 @@ sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import timedelta
 from matplotlib.ticker import NullFormatter
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
@@ -51,9 +52,15 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
     ax.set_xlabel('Date')
     ax.set_ylabel(ylabel)
     for s in series:
-        ax.plot(s[initialPlotDate:finalPlotDate])
-    if plotZeroLine:
-        ax.axhline(y=0,linestyle='--',color='gray')
+        d = pd.date_range(start=s[initialPlotDate:finalPlotDate].index[0], end=s[initialPlotDate:finalPlotDate].index[-1], freq="B")
+        ax.plot(np.arange(len(s[initialPlotDate:finalPlotDate])), s[initialPlotDate:finalPlotDate])
+        xticks = ax.get_xticks()
+        xticklabels = [(d[0] + x).strftime('%Y-%m-%d') for x in xticks.astype(int)]
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels)
+    ax.autoscale(True, axis='x')
+    ax.grid()
+    fig.autofmt_xdate()
     if saveImg:
         saveName = saveName if saveName else '{}'.format(s[0].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
