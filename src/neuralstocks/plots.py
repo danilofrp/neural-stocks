@@ -420,3 +420,28 @@ def scatterHist(s1, s2, nBins, saveImg = False, saveDir = '', saveName = '', sav
         saveName = saveName if saveName else '{}_{}_scatterHist'.format(s1, s2)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
     return fig, ax
+
+def estimatePDF(series, colors, nBins, overlap = True):
+    maximum = minimum = series[0].dropna().mean()
+    for s in series:
+        maximum = s.dropna().max() if s.dropna().max() > maximum else maximum
+        minimum = s.dropna().min() if s.dropna().min() < minimum else minimum
+
+    binCenters = np.linspace(minimum, maximum, nBins)
+    if overlap:
+        fig, ax = plt.subplots(figsize = (15, 10), nrows = 1, ncols = 1)
+    else:
+        fig, ax = plt.subplots(figsize = (10, len(series)*5), nrows = len(series), ncols = 1)
+    for i in range(len(series)):
+        hist, _ = np.histogram(series[i].dropna(), bins = nBins, range=(minimum, maximum), density=True)
+        if overlap:
+            ax.plot(binCenters, hist, color = colors[i], label = series[i].name)
+        else:
+            ax[i].plot(binCenters, hist, color = colors[i], label = series[i].name)
+            ax[i].grid()
+
+    if overlap:
+        ax.grid()
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, labels, loc='best')
+    return fig, ax
