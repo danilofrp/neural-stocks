@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
+sys.path.append('../src')
 import pandas as pd
 from pyTaLib.indicators import *
 from neuralstocks.preprocessing import *
@@ -8,7 +8,8 @@ from neuralstocks.utils import *
 from pyTaLib.indicators import *
 
 def acquireData(filePath, replicateForHolidays = False, meanStdLen = None, returnCalcParams = [], SMAparams = [], EMAparams = [],
-                MACDParams = [], BBParams = [], OBVParams = [], deTrendParams = None, colPrefix = None, dropNan = False):
+                MACDParams = [], BBParams = [], OBVParams = [], deTrendParams = None, colPrefix = None, dropNan = False,
+                force = False):
     """
     Data Acquisition
 
@@ -49,50 +50,60 @@ def acquireData(filePath, replicateForHolidays = False, meanStdLen = None, retur
     dropNan: bool, indicates either or not to exclude any lines containing nan-values
         of the dataSet. Default False
 
+    force: boll, if True, forces the calculation of the auxiliary series as from scratch,
+        using the give input parameters. If False, will search for a file of pre calculated
+        auxiliary series. Calculates from given inputs only if no files is found.
+        Default False 
+
     Returns
     ----------
     df : pandas.DataFrame, DataFrame containing original data and any aditional
         calculations specified in function params
     """
-    df = pd.read_csv(filePath, delimiter=';', decimal=',',
-                     parse_dates=['Date'], dayfirst=True, index_col='Date')
-    df = df.sort_index() #csv entries begin from most recent to older dates
+    # check if previous preprocessing has been made
+    if not force and os.path.isfile(filePath.replace('.CSV', '_prep.CSV')):
+        df = pd.read_csv(filePath.replace('.CSV', '_prep.CSV'), parse_dates=['Date'], index_col='Date')
+        df = df.sort_index()
+    else:
+        df = pd.read_csv(filePath, delimiter=';', decimal=',',
+                         parse_dates=['Date'], dayfirst=True, index_col='Date')
+        df = df.sort_index() #csv entries begin from most recent to older dates
 
-    if replicateForHolidays:
-        df = insertHolidays(df)
+        if replicateForHolidays:
+            df = insertHolidays(df)
 
-    if meanStdLen:
-        df = pd.concat([df, pd.Series(df['Close'].rolling(window=meanStdLen,center=False).mean(), name = 'Close_rollMean{}'.format(meanStdLen))], axis=1)
-        df = pd.concat([df, pd.Series(df['Close'].rolling(window=meanStdLen,center=False).std(), name = 'Close_rollStd{}'.format(meanStdLen))], axis=1)
+        if meanStdLen:
+            df = pd.concat([df, pd.Series(df['Close'].rolling(window=meanStdLen,center=False).mean(), name = 'Close_rollMean{}'.format(meanStdLen))], axis=1)
+            df = pd.concat([df, pd.Series(df['Close'].rolling(window=meanStdLen,center=False).std(), name = 'Close_rollStd{}'.format(meanStdLen))], axis=1)
 
-    if len(SMAparams) > 0:
-        for param in SMAparams:
-            df = calculateSMAs(df, column = param['column'], lenghts = param['lenght'])
+        if len(SMAparams) > 0:
+            for param in SMAparams:
+                df = calculateSMAs(df, column = param['column'], lenghts = param['lenght'])
 
-    if len(EMAparams) > 0:
-        for param in EMAparams:
-            df = calculateEMAs(df, column = param['column'], lenghts = param['lenght'])
+        if len(EMAparams) > 0:
+            for param in EMAparams:
+                df = calculateEMAs(df, column = param['column'], lenghts = param['lenght'])
 
-    if len(MACDParams) > 0:
-        for param in MACDParams:
-            df = pd.concat([df, MACD(df, n_fast = param['fast_lenght'], n_slow = param['slow_lenght'], n_signal = param['signal_lenght'])], axis = 1)
+        if len(MACDParams) > 0:
+            for param in MACDParams:
+                df = pd.concat([df, MACD(df, n_fast = param['fast_lenght'], n_slow = param['slow_lenght'], n_signal = param['signal_lenght'])], axis = 1)
 
-    if len(BBParams) > 0:
-        for param in BBParams:
-            df = pd.concat([df, BBANDS(df, n = param['lenght'])], axis = 1)
+        if len(BBParams) > 0:
+            for param in BBParams:
+                df = pd.concat([df, BBANDS(df, n = param['lenght'])], axis = 1)
 
-    if len(OBVParams) > 0:
-        for param in OBVParams:
-            df = pd.concat([df, OBV(df, n = param['lenght'])], axis = 1)
+        if len(OBVParams) > 0:
+            for param in OBVParams:
+                df = pd.concat([df, OBV(df, n = param['lenght'])], axis = 1)
 
-    for cols in returnCalcParams:
-        if len(cols) == 1:
-            df = pd.concat([df, logReturns(df[cols[0]])], axis=1)
-        elif len(cols) == 2:
-            df = pd.concat([df, logReturns(df[cols[0]], df[cols[1]])], axis=1)
+        for cols in returnCalcParams:
+            if len(cols) == 1:
+                df = pd.concat([df, logReturns(df[cols[0]])], axis=1)
+            elif len(cols) == 2:
+                df = pd.concat([df, logReturns(df[cols[0]], df[cols[1]])], axis=1)
 
-    if deTrendParams:
-        deTrend(df, column = deTrendParams['column'], window = deTrendParams['window'], model = deTrendParams['model'], weightModel = deTrendParams['weightModel'], weightModelWindow = deTrendParams['weightModelWindow'])
+        if deTrendParams:
+            deTrend(df, column = deTrendParams['column'], window = deTrendParams['window'], model = deTrendParams['model'], weightModel = deTrendParams['weightModel'], weightModelWindow = deTrendParams['weightModelWindow'])
 
     if (colPrefix):
         new_names = [(column, colPrefix + '_' + column) for column in df.columns.values]
