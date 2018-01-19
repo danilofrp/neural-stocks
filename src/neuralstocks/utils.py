@@ -74,7 +74,7 @@ def autocorrelation(x, nlags = 0):
     """
     return [x.corr(x.shift(lag)) for lag in range(nlags + 1)]
 
-def KLDiv(p, q, nBins, bins = np.array([-1,0, 1])):
+def KLDiv(p, q, nBins = 100, bins = np.array([-1,0, 1])):
     maximum = max(p.dropna().max(), q.dropna().max())
     minimum = min(p.dropna().min(), q.dropna().min())
     [p_pdf,p_bins] = np.histogram(p.dropna(), bins = nBins, range = (minimum, maximum), density = True)
