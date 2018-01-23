@@ -61,6 +61,7 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
     ax.autoscale(True, axis='x')
     ax.grid()
     fig.autofmt_xdate()
+    plt.legend()
     if saveImg:
         saveName = saveName if saveName else '{}'.format(s[0].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')

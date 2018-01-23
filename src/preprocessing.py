@@ -26,7 +26,7 @@ decomposeModel = 'additive'
 saveDir = '/home/danilofrp/projeto_final/results/preprocessing/misc'
 if not os.path.exists(saveDir):
     os.makedirs(saveDir)
-saveFormat = 'png'
+saveFormat = 'pdf'
 
 plt.rcParams['font.weight'] = 'bold'
 plt.rcParams['figure.titlesize'] = 18
@@ -44,18 +44,21 @@ plt.rcParams['ytick.labelsize'] = 13
 df = acquireData(filePath = filePath,
                  replicateForHolidays = True,
                  meanStdLen = 20,
-                 returnCalcParams = [['Close'], ['Close', 'Open']],
-                 EMAparams = [{'column': 'Close', 'lenght': 17}, {'column': 'Close', 'lenght': 72}, {'column': 'Volume', 'lenght': 21}],
+                 returnCalcParams = [['Close'], ['Close', 'Open'], ['High', 'Close' ], ['Low', 'Close']],
+                 EMAparams = [{'column': 'Close', 'lenght': 17},
+                              {'column': 'Close', 'lenght': 72},
+                              {'column': 'Close', 'lenght': 200},
+                              {'column': 'Volume', 'lenght': 21}],
                  MACDParams = [{'fast_lenght': 12, 'slow_lenght': 26, 'signal_lenght': 9}],
                  BBParams = [{'lenght': 20}],
                  OBVParams = [{'lenght': None}],
-                 #deTrendParams = {'column': 'Close', 'window': 10, 'model': decomposeModel, 'weightModel': 'window_acorr', 'weightModelWindow': 25},
+                 deTrendParams = {'column': 'Close', 'window': 6, 'model': decomposeModel, 'weightModel': 'window_acorr', 'weightModelWindow': 18},
                  colPrefix = None,
                  dropNan = False)
 df.tail(1)
 df.columns.values
 
-plotSeries([df['Close'], df['Close_trend']], title = None, initialPlotDate = '2017', finalPlotDate = '2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotSeries([df['Close']], title = None, initialPlotDate = '2017-05', finalPlotDate = '2017-06', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 plotReturnSeries(df, column = 'Close', asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -68,8 +71,8 @@ deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, 
 deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = 100,
             plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrend(df, column = 'Close', window = 10, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = 25,
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+deTrend(df, column = 'Close', window = 6, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = 17,
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = False, detailed = False, saveImg = True, saveDir = saveDir, saveName = 'PETR4_decompose_trend_6_windowacf_17', saveFormat = saveFormat)
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -90,7 +93,7 @@ plotPeriodogramStats(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLo
 
 plotPeriodogramSciPy(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLog = False, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-plotFFT(df['Close_EMA72_logdiff'], saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotFFT(df['Close_resid'], title = 'Remaining Series and its FFT', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 plotSeasonalDecompose(df['Close'],  asset = asset, frequency=5, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -100,7 +103,7 @@ plotAcf(df['Close'][:4000][-75:], lags = 25, saveImg = False, saveDir = saveDir,
 
 plotCrosscorrelation(df['Close_returns'], df['Close_EMA72_logdiff'], 50, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-histogram([df['Close'], df['Close_trend']], colors = ['b', 'r'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+histogram([df['Close_resid']], colors = ['b'], nBins=100, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
 deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, weightModel = 'full_acorr', weightModelWindow = None)
@@ -205,4 +208,94 @@ for i in range(2, windowMaxSize + 1):
 fig, ax = plt.subplots(figsize=(10,10))
 plt.imshow(RSS[2:,:], cmap="jet", extent=[2, windowMaxSize, 0, maxFreq], aspect="auto")
 cbar = plt.colorbar()
+
+df2 = df.copy()
+model = 'additive'
+fitOrder = 1
+windowMaxSize = 15
+column = 'Close'
+weightModel = None
+weightModelWindow = None
+RMSE = np.empty(windowMaxSize + 1)*np.nan
+for i in range(fitOrder + 1, windowMaxSize + 1):
+    print('Running deTrend ({})'.format(i), end='\r')
+    deTrend(df2, column = column, window = i, model = model, fitOrder = fitOrder, weightModel = weightModel, weightModelWindow = weightModelWindow)
+    if model == 'multiplicative':
+        RMSE[i] = np.sqrt(np.square(df2['{}_resid'.format(column)].dropna() - 1).sum()/(len(df2['{}_resid'.format(column)].dropna())))
+    else:
+        RMSE[i] = np.sqrt(np.square(df2['{}_resid'.format(column)].dropna()).sum()/(len(df2['{}_resid'.format(column)].dropna())))
+
+fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
+ax.set_title('DeTrend RMSE per trend window size', fontsize = 20, fontweight = 'bold')
+ax.set_xlabel('Window size')
+ax.set_ylabel('RMSE')
+ax.plot(range(0,windowMaxSize+1), RMSE, 'bo')
+minValue = min(RMSE[fitOrder + 1 : windowMaxSize + 1])
+for i in range(fitOrder + 1, windowMaxSize + 1):
+    if RMSE[i] == minValue:
+        minIndex = i
+plt.figtext(0.5,  0.010, 'Minimal RSME: {:.3f}, using Trend window with {} samples'.format(minValue, minIndex), size = 14, horizontalalignment = 'center')
+
+
+
+saveName = '{}_deTrendRMSE'.format('PETR4')
+fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+
+
+
 # </editor-fold>
+
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+
+def scallingHistograms(series, nBins = 100, showTestOnly = True, title = None, quantile_range=(25.0, 75.0)):
+    original = series.dropna().copy()
+    fig, ax = plt.subplots(figsize = (10,10), nrows = 3, ncols = 1)
+
+    maximum = original.dropna().max()
+    minimum = original.dropna().min()
+    binCenters = np.linspace(minimum, maximum, nBins)
+    if showTestOnly:
+        ax[0].hist(original['2017'].dropna(), bins = binCenters, normed = 1)
+    else:
+        ax[0].hist(original.dropna(), bins = binCenters, normed = 1)
+    ax[0].set_title(title if title else series.name)
+
+    MMScaler = MinMaxScaler(feature_range=(-1,1))
+    MMScaler.fit(original[:'2016'].reshape(-1,1))
+    if showTestOnly:
+        scaledMM = MMScaler.transform(original['2017'].reshape(-1,1))
+    else:
+        scaledMM = MMScaler.transform(original.reshape(-1,1))
+    maximum = MMScaler.transform(original.reshape(-1,1)).max()
+    minimum = MMScaler.transform(original.reshape(-1,1)).min()
+    binCenters = np.linspace(minimum, maximum, nBins)
+    ax[1].hist(scaledMM, bins = binCenters, normed = 1)
+    ax[1].set_title('MinMaxScaler')
+
+    StdScaler = StandardScaler()
+    StdScaler.fit(original[:'2016'].reshape(-1,1))
+    if showTestOnly:
+        scaledStd = StdScaler.transform(original['2017'].reshape(-1,1))
+    else:
+        scaledStd = StdScaler.transform(original.reshape(-1,1))
+    maximum = StdScaler.transform(original.reshape(-1,1)).max()
+    minimum = StdScaler.transform(original.reshape(-1,1)).min()
+    binCenters = np.linspace(minimum, maximum, nBins)
+    ax[2].hist(scaledStd, bins = binCenters, normed = 1)
+    ax[2].set_title('StandardScaler')
+
+    # RobScaler = RobustScaler(quantile_range=quantile_range)
+    # RobScaler.fit(original[:'2016'].reshape(-1,1))
+    # scaledRob = RobScaler.transform(original['2017'].reshape(-1,1))
+    # maximum = RobScaler.transform(original.reshape(-1,1)).max()
+    # minimum = RobScaler.transform(original.reshape(-1,1)).min()
+    # binCenters = np.linspace(minimum, maximum, nBins)
+    # ax[3].hist(scaledRob, bins = binCenters, normed = 1)
+    # ax[3].set_title('RobustScaler')
+
+    return fig, ax
+
+
+_ , _ = scallingHistograms(df['Close_returns'], nBins = 50, showTestOnly = True)
+
+_ , _  = scallingHistograms(df['Close_resid'], nBins = 50, showTestOnly = True)
