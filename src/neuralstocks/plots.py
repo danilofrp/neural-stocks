@@ -168,7 +168,7 @@ def plotDeTrendResult(df, column, window, model, weightModel, weightModelWindow,
     residName = column + '_resid'
     initialPlotDate = initialPlotDate if initialPlotDate else df.index[0]
     finalPlotDate = finalPlotDate if finalPlotDate else df.index[-1]
-    fig, ax = plt.subplots(figsize=(15,10), nrows = 2 + int(not overlap), ncols = 1, sharex = True)
+    fig, ax = plt.subplots(figsize=(10,10), nrows = 2 + int(not overlap), ncols = 1, sharex = True)
     plt.xlabel('Date')
     title = 'Observed and Predicted' if overlap else 'Observed'
     ax[0].set_title(title)
@@ -212,7 +212,7 @@ def plotPeriodogram(s, plotInit = 0, plotEnd = None, yLog = False, saveImg = Fal
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
     return fig, ax
 
-def plotFFT(s, saveImg = False, title = 'FFT', saveDir = '', saveName = '', saveFormat = 'pdf'):
+def plotFFT(s, yLog = False, saveImg = False, title = 'FFT', saveDir = '', saveName = '', saveFormat = 'pdf'):
     Fs = 1.0;  # sampling rate
     Ts = 1.0/Fs; # sampling interval
     y = s.dropna() - 1 if s.dropna().mean() > 0.5 else s.dropna()
@@ -225,13 +225,15 @@ def plotFFT(s, saveImg = False, title = 'FFT', saveDir = '', saveName = '', save
     Y = np.fft.fft(y)/n # fft computing and normalization
     Y = Y[range(n/2)]
 
-    fig, ax = plt.subplots(2, 1, figsize=(15,10))
+    fig, ax = plt.subplots(2, 1, figsize=(10,10))
     ax[0].set_title(title)
     ax[0].plot(y)
     ax[0].set_xlabel('Time')
     ax[0].set_ylabel('Amplitude')
+    if yLog:
+        ax[1].set_yscale('log')
     ax[1].plot(frq,abs(Y), 'r') # plotting the spectrum
-    ax[1].set_xlabel('Freq (1/sample)')
+    ax[1].set_xlabel('Freq')
     ax[1].set_ylabel('|X(freq)|')
     if saveImg:
         saveName = saveName if saveName else '{}_FFT'.format(s.name)

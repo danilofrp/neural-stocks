@@ -235,7 +235,7 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
         else:
             RMSE[i] = np.sqrt(np.square(df2['{}_resid'.format(column)].dropna()).sum()/(len(df2.dropna())))
     fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
-    ax.set_title('DeTrend RMSE per window size ({} model)'.format(model), fontsize = 20, fontweight = 'bold')
+    ax.set_title('DeTrend RMSE per window size', fontsize = 20, fontweight = 'bold')
     ax.set_xlabel('Window size')
     ax.set_ylabel('RMSE')
     ax.plot(range(0,windowMaxSize+1), RMSE, 'bo')
@@ -243,9 +243,10 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
     for i in range(fitOrder + 1, windowMaxSize + 1):
         if RMSE[i] == minValue:
             minIndex = i
-    plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
+    #plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
+    plt.figtext(0.45,  0.010, 'Minimal RMSE: {:.5f}, using Trend window of {} samples'.format(RMSE[minIndex], minIndex), size = 18, horizontalalignment = 'center')
     if saveImg:
-        saveName = saveName if saveName else '{}_deTrendRMSE'.format(s.name)
+        saveName = saveName if saveName else '{}_deTrendRMSE'.format(df[column].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
 def deSeasonRMSE(df, column, model = 'additive', maxFreq = 20, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):

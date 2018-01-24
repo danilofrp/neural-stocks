@@ -29,14 +29,14 @@ if not os.path.exists(saveDir):
 saveFormat = 'pdf'
 
 plt.rcParams['font.weight'] = 'bold'
-plt.rcParams['figure.titlesize'] = 18
+plt.rcParams['figure.titlesize'] = 20
 plt.rcParams['figure.titleweight'] = 'bold'
-plt.rcParams['axes.titlesize'] = 15
+plt.rcParams['axes.titlesize'] = 20
 plt.rcParams['axes.titleweight'] = 'bold'
-plt.rcParams['axes.labelsize'] = 15
+plt.rcParams['axes.labelsize'] = 18
 plt.rcParams['axes.labelweight'] = 'bold'
-plt.rcParams['xtick.labelsize'] = 13
-plt.rcParams['ytick.labelsize'] = 13
+plt.rcParams['xtick.labelsize'] = 16
+plt.rcParams['ytick.labelsize'] = 16
 # </editor-fold>
 
 # <editor-fold> workspace
@@ -71,12 +71,12 @@ deTrend(df, column = 'Close', window = 3, model = decomposeModel, fitOrder = 1, 
 deTrend(df, column = 'Close', window = 25, model = decomposeModel, fitOrder = 1, weightModel = 'window_pgram', weightModelWindow = 100,
             plot = True, initialPlotDate = '', finalPlotDate = '', overlap = True, detailed = True, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrend(df, column = 'Close', window = 6, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = 17,
-            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = False, detailed = False, saveImg = True, saveDir = saveDir, saveName = 'PETR4_decompose_trend_6_windowacf_17', saveFormat = saveFormat)
+deTrend(df, column = 'PETR4_Close', window = 6, model = decomposeModel, fitOrder = 1, weightModel = 'window_acorr', weightModelWindow = 18,
+            plot = True, initialPlotDate = '', finalPlotDate = '', overlap = False, detailed = False, saveImg = False, saveDir = saveDir, saveName = 'PETR4_decompose_trend_6_windowacf_17', saveFormat = saveFormat)
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 10, weightModel = None, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+deTrendRMSE(df[:'2016'], column = 'PETR4_Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 15, weightModel = None, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'full_pgram', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -93,7 +93,7 @@ plotPeriodogramStats(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLo
 
 plotPeriodogramSciPy(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLog = False, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-plotFFT(df['Close_resid'], title = 'Remaining Series and its FFT', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotFFT(df['PETR4_Close_resid'], yLog = True, title = 'Remaining Series and its FFT', saveImg = True, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 plotSeasonalDecompose(df['Close'],  asset = asset, frequency=5, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -243,7 +243,6 @@ fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight
 
 
 
-# </editor-fold>
 
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 
@@ -299,3 +298,5 @@ def scallingHistograms(series, nBins = 100, showTestOnly = True, title = None, q
 _ , _ = scallingHistograms(df['Close_returns'], nBins = 50, showTestOnly = True)
 
 _ , _  = scallingHistograms(df['Close_resid'], nBins = 50, showTestOnly = True)
+
+# </editor-fold>
