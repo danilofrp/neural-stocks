@@ -16,7 +16,7 @@ from neuralstocks.utils import *
 # <editor-fold> PARAMS
 dataPath = '/home/danilofrp/projeto_final/data'
 assetType = 'stocks'
-asset = 'PETR4'
+asset = 'ITUB4'
 frequency = 'diario'
 
 filePath = dataPath + '/' + assetType + '/' + asset + '/' + frequency + '/' + asset + '.CSV'
@@ -58,7 +58,7 @@ df = acquireData(filePath = filePath,
 df.tail(1)
 df.columns.values
 
-plotSeries([df['Close']], title = None, initialPlotDate = '2017-05', finalPlotDate = '2017-06', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotSeries([df['ITUB4_Close']], title = None, initialPlotDate = '2017', finalPlotDate = '2017-03', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 plotReturnSeries(df, column = 'Close', asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -93,7 +93,7 @@ plotPeriodogramStats(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLo
 
 plotPeriodogramSciPy(df['Close_EMA72_logdiff'], plotInit = 2, plotEnd = 100, yLog = False, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-plotFFT(df['PETR4_Close_resid'], yLog = True, title = 'Remaining Series and its FFT', saveImg = True, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotFFT(df['ITUB4_Close_resid'], yLog = True, title = 'Remaining Series and its FFT', saveImg = True, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 plotSeasonalDecompose(df['Close'],  asset = asset, frequency=5, initialPlotDate='2016', finalPlotDate='2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 

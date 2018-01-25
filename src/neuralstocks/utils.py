@@ -141,3 +141,15 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize, validation
 def reconstructReturns(observed, predictedReturns):
     predicted = observed.shift() * np.exp(predictedReturns)
     return predicted
+
+def calculateRMSE(s1, s2):
+    if len(s1) != len(s2):
+        print 'Error: both series must have equal lenght'
+    else:
+        return np.sqrt(np.square(s1 - s2).sum()/len(s1))
+
+def calculateMAE(s1, s2):
+    if len(s1) != len(s2):
+        print 'Error: both series must have equal lenght'
+    else:
+        return (np.abs(s1 - s2).sum())/len(s1)

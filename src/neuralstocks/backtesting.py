@@ -1,26 +1,14 @@
 from __future__ import division
 import numpy as np
 import pandas as pd
+import matplotlib.ṕyplot as plt
 import random
 from collections import defaultdict
 from datetime import timedelta
+from matplotlib.ticker import EngFormatter
 
 class Backtest:
-    dailyData = {}
-    history = {}
-    verbose = 0;
-    shortedFunds = 0
-    pendingOperations = []
-    openPositions = []
-    strategy = ''
-    predictedValues = {}
     oneDay = timedelta(days = 1)
-
-    useRiskManagement = False
-    stopLoss = None
-    stopGain = None
-    maxExposure = None
-    maxTotalExposure = None
 
     def __init__(self, assets, dataPath = '../../../data/stocks/[asset]/diario/[asset].CSV', initialFunds = 100000,
                  brokerage = 6.0, transactionFees = 0.000325, ISStax = 0.05):
@@ -30,6 +18,21 @@ class Backtest:
         self.brokerage = brokerage
         self.transactionFees = transactionFees
         self.ISStax = ISStax
+
+        self.history = {}
+        self.dailyData = {}
+        self.verbose = 0;
+        self.shortedFunds = 0
+        self.pendingOperations = []
+        self.openPositions = []
+        self.strategy = ''
+        self.predictedValues = {}
+
+        self.useRiskManagement = False
+        self.stopLoss = None
+        self.stopGain = None
+        self.maxExposure = None
+        self.maxTotalExposure = None
 
         self.loadData()
 
@@ -47,10 +50,11 @@ class Backtest:
                      parse_dates=['Date'], dayfirst=True, index_col='Date').sort_index()
             self.dailyData[asset] = df
 
-    def simulate(self, funds = None, strategy = 'buy-n-hold', start = None, end = None, longOnly = False, predicted = None, simulationName = None, verbose = 0):
+    def simulate(self, funds, strategy = 'buy-n-hold', start = None, end = None, longOnly = False, predicted = None, simulationName = None, verbose = 0):
         simulationName = simulationName if simulationName else strategy
+        print('Starting {} simulation with {}'.format(simulationName, self.assets))
         self.strategy = strategy
-        self.funds = funds if funds else self.funds
+        self.funds = funds
         self.verbose = verbose
         if strategy == 'buy-n-hold':
             self.buyNHold(start, end)
@@ -119,9 +123,9 @@ class Backtest:
                     print('{} - Skipped {}, no profit predicted'.format(date.strftime('%Y-%m-%d'), asset))
 
     def evaluateOperation(self, date, asset):
-        if  self.predictedValues[asset][date] > self.dailyData[asset]['Close'][:date][-2]:
+        if  self.predictedValues[asset][date] > self.dailyData[asset]['Close'][:date][-2] + 0.05:
             return 'long'
-        elif self.predictedValues[asset][date] < self.dailyData[asset]['Close'][:date][-2]:
+        elif self.predictedValues[asset][date] < self.dailyData[asset]['Close'][:date][-2] - 0.05:
             return 'short'
         else:
             return 'skip'
@@ -208,6 +212,46 @@ class Backtest:
         if self.history[simulationName] is not None and self.history[simulationName]['portfolioValue'] is not None:
             drawdown = (self.history[simulationName]['portfolioValue'] - np.maximum.accumulate(self.history[simulationName]['portfolioValue']))/np.maximum.accumulate(self.history[simulationName]['portfolioValue'])
             self.history[simulationName] = self.history[simulationName].assign(drawdown = drawdown)
+
+    def plotSimulations(self, simulations = None, names = None, title = None, ylabel = None, initialPlotDate = None, finalPlotDate = None, figsize = (10,6), legendsize = 12, linestyle = '-', linewidth = 2.0, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
+        if len(self.history) == 0:
+            print('No saved simulations found!')
+            return None
+        initialPlotDate = self.history[self.history.keys()[0]]['portfolioValue'][initialPlotDate:].index[0]
+        finalPlotDate = self.history[self.history.keys()[0]]['portfolioValue'][:finalPlotDate].index[-1]
+        if not title:
+            title = 'Portfolio Value'
+        if not ylabel:
+            ylabel = 'BRL'
+
+        fig, ax = plt.subplots(figsize=figsize, nrows = 1, ncols = 1)
+        fig.suptitle(title)
+        ax.set_xlabel('Date')
+        ax.set_ylabel(ylabel)
+        simulationsToPlot = len(simulations) if simulations is not None else len(self.history)
+        simulations = simulations if simulations is not None else list(self.history.keys())
+        if names is None:
+            names = simulations
+        formatter = EngFormatter(unit='')
+        ax.yaxis.set_major_formatter(formatter)
+        for i in range(simulationsToPlot):
+            s = self.history[simulations[i]]['portfolioValue']
+            d = pd.date_range(start=s[initialPlotDate:finalPlotDate].index[0], end=s[initialPlotDate:finalPlotDate].index[-1], freq="B")
+            ax.plot(np.arange(len(s[initialPlotDate:finalPlotDate])), s[initialPlotDate:finalPlotDate], linestyle, label = names[i], linewidth = linewidth)
+            xticks = ax.get_xticks()
+            ax.set_xticks(xticks)
+            xticklabels = [(d[0] + x).strftime('%Y-%m') for x in xticks.astype(int)]
+            ax.set_xticklabels(xticklabels)
+        ax.plot(np.arange(len(s[initialPlotDate:finalPlotDate])), 100000 * np.ones(np.arange(len(s[initialPlotDate:finalPlotDate])).shape), 'k--', linewidth=linewidth)
+        ax.autoscale(True, axis='x')
+        ax.grid()
+        fig.autofmt_xdate()
+        #plt.legend(prop={'size': legendSize}, loc = 'best')
+        plt.legend(bbox_to_anchor=(0., 1.00, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0., prop={'size': legendsize}, frameon=False)
+        if saveImg:
+            saveName = saveName if saveName else '{}'.format(s[0].name)
+            fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+        return fig, ax
 
 
 class Position:
