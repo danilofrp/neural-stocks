@@ -3,32 +3,38 @@ import numpy as np
 import pandas as pd
 import random
 from collections import defaultdict
+from datetime import timedelta
 
 class Backtest:
     dailyData = {}
     history = {}
     verbose = 0;
     shortedFunds = 0
+    pendingOperations = []
     openPositions = []
     strategy = ''
+    predictedValues = {}
+    oneDay = timedelta(days = 1)
 
+    useRiskManagement = False
     stopLoss = None
     stopGain = None
     maxExposure = None
     maxTotalExposure = None
 
-    def __init__(self, assets, dataPath = '../../../data/stocks/[asset]/diario/[asset].CSV', funds = 100000,
+    def __init__(self, assets, dataPath = '../../../data/stocks/[asset]/diario/[asset].CSV', initialFunds = 100000,
                  brokerage = 6.0, transactionFees = 0.000325, ISStax = 0.05):
         self.assets = assets
         self.dataPath = dataPath
-        self.funds = funds
+        self.funds = initialFunds
         self.brokerage = brokerage
         self.transactionFees = transactionFees
         self.ISStax = ISStax
 
         self.loadData()
 
-    def setRiskManagement(self, stopLoss = None, stopGain = None, maxExposure = None, maxTotalExposure = None):
+    def setRiskManagement(self, stopLoss = None, stopGain = None, maxExposure = None, maxTotalExposure = None, useRiskManagement = True):
+        self.useRiskManagement = useRiskManagement
         self.stopLoss = stopLoss
         self.stopGain = stopGain
         self.maxExposure = maxExposure
@@ -41,21 +47,29 @@ class Backtest:
                      parse_dates=['Date'], dayfirst=True, index_col='Date').sort_index()
             self.dailyData[asset] = df
 
-    def simulate(self, funds = None, strategy = 'buy-n-hold', start = None, end = None, longOnly = False, predicted = None, verbose = 0):
-        self.strategy = strategy if strategy else self.strategy
+    def simulate(self, funds = None, strategy = 'buy-n-hold', start = None, end = None, longOnly = False, predicted = None, simulationName = None, verbose = 0):
+        simulationName = simulationName if simulationName else strategy
+        self.strategy = strategy
         self.funds = funds if funds else self.funds
         self.verbose = verbose
-        if predicted:
-            for asset in assets:
-                if not predicted[asset]:
-                    print('Warning: No predictions for {}. This asset will be excluded from the simulation.'.format(asset))
-                else:
-                    self.dailyData[asset] = pd.concat([self.dailyData[asset], predicted[asset]], axis = 1)
         if strategy == 'buy-n-hold':
             self.buyNHold(start, end)
-        else:
+        elif strategy == 'repeatLast':
             pass
-            #for i in range(len(predicted)):
+        elif strategy == 'predicted':
+            if predicted:
+                for asset in self.assets:
+                    if not predicted[asset].any():
+                        print('Warning: No predictions for {}. This asset will be excluded from the simulation.'.format(asset))
+                    else:
+                        self.predictedValues[asset] = predicted[asset]
+            if self.predictedValues:
+                self.simulatePredicted(start, end, simulationName)
+            else:
+                print('No predicted values given for the selected assets')
+            self.predictedValues = {}
+        else:
+            print('Selected strategy not recognized')
 
     def buyNHold(self, start, end):
         self.history['buy-n-hold'] = pd.DataFrame(index=self.dailyData[self.assets[0]][start:end].index, columns=['portfolioValue'])
@@ -71,37 +85,112 @@ class Backtest:
         for d in self.dailyData[self.assets[0]][start:end].index:
             date = d
             self.history['buy-n-hold'].at[date, 'portfolioValue'] = self.evaluatePortfolio(date)
-            if self.verbose >= 2:
+            if self.verbose >= 1:
                 print('Portfolio value at {} market close: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), self.history['buy-n-hold']['portfolioValue'][date]))
         #sell all
-        for asset in self.assets:
-            self.sell(asset = asset, date = self.dailyData[asset][start:end].index[-1])
+        self.liquidateAll(date)
         print('Portfolio value at end: {:.2f} BRL'.format(self.funds))
-        self.calculateDrawdown()
+        self.calculateDrawdown('buy-n-hold')
 
-    def buy(self, asset, date, volume = None, limitValue = None):
-        price = self.dailyData[asset]['Open'][date]
-        if not volume and not limitValue:
-            print('{} - Error buying {} - Neither volume nor limitValue were specified'.format(day, asset))
+    def simulatePredicted(self, start, end, simulationName = 'predicted'):
+        self.history[simulationName] = pd.DataFrame(index=self.dailyData[self.assets[0]][start:end].index, columns=['portfolioValue'])
+        maxValue = self.funds / len(self.assets)
+        date = self.dailyData[self.assets[0]][start:end].index[0]
+        print('Portfolio value at start: {:.2f} BRL'.format(self.funds))
+        # simulate for every day in the simulation period
+        for d in self.dailyData[self.assets[0]][start:end].index:
+            date = d
+            self.decideOperations(date)
+            self.executeOperations(maxValue)
+            self.liquidateAll()
+            self.history[simulationName].at[date, 'portfolioValue'] = self.evaluatePortfolio(date)
+            if self.verbose >= 1:
+                print('Portfolio value at {} market close: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), self.history[simulationName]['portfolioValue'][date]))
+        print('Portfolio value at end: {:.2f} BRL'.format(self.funds))
+        self.calculateDrawdown(simulationName)
+
+    def decideOperations(self, date):
+        for asset in self.assets:
+            op = self.evaluateOperation(date, asset)
+            if op == 'long' or op == 'short':
+                self.pendingOperations.append(self.createPosition(asset, op, -1, -1, date))
+            if op == 'skip':
+                if self.verbose >= 2:
+                    print('{} - Skipped {}, no profit predicted'.format(date.strftime('%Y-%m-%d'), asset))
+
+    def evaluateOperation(self, date, asset):
+        if  self.predictedValues[asset][date] > self.dailyData[asset]['Close'][:date][-2]:
+            return 'long'
+        elif self.predictedValues[asset][date] < self.dailyData[asset]['Close'][:date][-2]:
+            return 'short'
         else:
-            limitVolume = int(((limitValue/price)//100)*100)
-            volume = volume if volume else limitVolume
-            buyValue = volume * price
-            fees = self.brokerage + (buyValue * self.transactionFees) + (self.brokerage * self.ISStax)
-            self.openPositions.append(self.createPosition(asset, 'long', volume, price, date))
-            self.funds -= (buyValue + fees)
-            if self.verbose >= 2:
-                print('{} Open - Bought {} {}. price: {} BRL, fees: {:.2f}, total: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), volume, asset, price, fees, buyValue + fees))
+            return 'skip'
 
-    def sell(self, asset, date):
-        operation = self.openPositions.pop(findIndex(self.openPositions, asset, lambda x, y: x['asset'] == y))
-        volume = operation['volume']
-        price = self.dailyData[asset]['Close'][date]
-        sellValue = volume * price
-        fees = self.brokerage + (sellValue * self.transactionFees) + (self.brokerage * self.ISStax)
-        self.funds += (sellValue - fees)
-        if self.verbose >= 2:
-            print('{} Close - Sold {} {}. price: {} BRL, fees: {:.2f}, total: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), volume, asset, price, fees, sellValue + fees))
+    def executeOperations(self, maxValue):
+        for i in range(len(self.pendingOperations)):
+            op = self.pendingOperations.pop(0)
+            if op['opType'] == 'long':
+                self.buy(op['asset'], op['date'], limitValue = maxValue)
+            elif op['opType'] == 'short':
+                self.sell(op['asset'], op['date'], limitValue = maxValue)
+
+    def liquidateAll(self, date = None):
+        for i in range(len(self.openPositions)):
+            pos = self.openPositions[0] # always 0 because entries will be popped by buy or sell operations
+            if pos['opType'] == 'long':
+                self.sell(pos['asset'], date = date)
+            elif pos['opType'] == 'short':
+                self.buy(pos['asset'], date = date)
+
+    def buy(self, asset, date = None, volume = None, limitValue = None):
+        # check if a short operation with this asset exists, liquidate if so
+        if len(filter(lambda op: op['asset'] == asset and op['opType'] == 'short', self.openPositions)) > 0:
+            operation = self.openPositions.pop(findIndex(self.openPositions, asset, lambda x, y: x['asset'] == y))
+            date = date if date else operation['date']
+            price = self.dailyData[asset]['Close'][date] - 0.01
+            buyValue = operation['volume'] * price
+            fees = self.brokerage + (buyValue * self.transactionFees) + (self.brokerage * self.ISStax)
+            self.funds = self.funds - buyValue - fees
+            if self.verbose >= 2:
+                print('{} Close - Bought {} {} (shorted). price: {} BRL, fees: {:.2f}, total: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), operation['volume'], asset, price, fees, buyValue + fees))
+        else: #longs the stock
+            price = self.dailyData[asset]['Open'][date] + 0.01
+            if not volume and not limitValue:
+                print('{} - Error buying {} - Neither volume nor limitValue were specified'.format(date, asset))
+            else:
+                limitVolume = int(((limitValue/price)//100)*100)
+                volume = volume if volume else limitVolume
+                buyValue = volume * price
+                fees = self.brokerage + (buyValue * self.transactionFees) + (self.brokerage * self.ISStax)
+                self.openPositions.append(self.createPosition(asset, 'long', volume, price, date))
+                self.funds = self.funds - buyValue - fees
+                if self.verbose >= 2:
+                    print('{} Open - Bought {} {}. price: {} BRL, fees: {:.2f}, total: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), volume, asset, price, fees, buyValue + fees))
+
+    def sell(self, asset, date = None, volume = None, limitValue = None):
+        # check if a long operation with this asset exists, liquidate if so
+        if len(filter(lambda op: op['asset'] == asset and op['opType'] == 'long', self.openPositions)) > 0:
+            operation = self.openPositions.pop(findIndex(self.openPositions, asset, lambda x, y: x['asset'] == y))
+            date = date if date else operation['date']
+            price = self.dailyData[asset]['Close'][date] - 0.01
+            sellValue = operation['volume'] * price
+            fees = self.brokerage + (sellValue * self.transactionFees) + (self.brokerage * self.ISStax)
+            self.funds = self.funds + sellValue - fees
+            if self.verbose >= 2:
+                print('{} Close - Sold {} {}. price: {} BRL, fees: {:.2f}, total: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), operation['volume'], asset, price, fees, sellValue + fees))
+        else: # shorts the stock
+            price = self.dailyData[asset]['Open'][date] + 0.01
+            if not volume and not limitValue:
+                print('{} - Error shorting {} - Neither volume nor limitValue were specified'.format(date, asset))
+            else:
+                limitVolume = int(((limitValue/price)//100)*100)
+                volume = volume if volume else limitVolume
+                sellValue = volume * price
+                fees = self.brokerage + (sellValue * self.transactionFees) + (self.brokerage * self.ISStax)
+                self.openPositions.append(self.createPosition(asset, 'short', volume, price, date))
+                self.funds = self.funds + sellValue - fees
+                if self.verbose >= 2:
+                    print('{} Open - Shorted {} {}. price: {} BRL, fees: {:.2f}, total: {:.2f} BRL'.format(date.strftime('%Y-%m-%d'), volume, asset, price, fees, sellValue + fees))
 
     def createPosition(self, asset, opType, volume, price, date = None):
         return {'asset': asset, 'opType': opType, 'volume': volume, 'price': price, 'date': date}
@@ -114,10 +203,11 @@ class Backtest:
             portfolio -= s['volume'] * self.dailyData[s['asset']][moment][date]
         return portfolio
 
-    def calculateDrawdown(self):
-        if self.history[self.strategy] is not None and self.history[self.strategy]['portfolioValue'] is not None:
-            drawdown = (self.history[self.strategy]['portfolioValue'] - np.maximum.accumulate(self.history[self.strategy]['portfolioValue']))/np.maximum.accumulate(self.history[self.strategy]['portfolioValue'])
-            self.history[self.strategy] = self.history[self.strategy].assign(drawdown = drawdown)
+    def calculateDrawdown(self, simulationName):
+        simulationName = simulationName if simulationName else self.strategy
+        if self.history[simulationName] is not None and self.history[simulationName]['portfolioValue'] is not None:
+            drawdown = (self.history[simulationName]['portfolioValue'] - np.maximum.accumulate(self.history[simulationName]['portfolioValue']))/np.maximum.accumulate(self.history[simulationName]['portfolioValue'])
+            self.history[simulationName] = self.history[simulationName].assign(drawdown = drawdown)
 
 
 class Position:
