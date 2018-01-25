@@ -239,7 +239,7 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
     ax.set_xlabel('Window size')
     ax.set_ylabel('RMSE')
     ax.grid()
-    ax.plot(range(0,windowMaxSize+1), RMSE, 'bo')
+    ax.plot(range(0,windowMaxSize+1), RMSE, 'bo', markersize=14)
     minValue = min(RMSE[fitOrder + 1 : windowMaxSize + 1])
     for i in range(fitOrder + 1, windowMaxSize + 1):
         if RMSE[i] == minValue:
