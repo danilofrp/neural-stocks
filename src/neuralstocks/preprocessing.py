@@ -223,7 +223,7 @@ def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5
             fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
 def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, weightModel = None, weightModelWindow = None,
-                saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+                figsize = (10,10), saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     df2 = df.copy()
     model = 'multiplicative' if model.startswith('m') else 'additive'
     RMSE = np.empty(windowMaxSize + 1)*np.nan
@@ -234,7 +234,7 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
             RMSE[i] = np.sqrt(np.square((df2['{}_resid'.format(column)].dropna() - 1)).sum()/(len(df2.dropna())))
         else:
             RMSE[i] = np.sqrt(np.square(df2['{}_resid'.format(column)].dropna()).sum()/(len(df2.dropna())))
-    fig, ax = plt.subplots(figsize=(10,10), nrows = 1, ncols = 1, sharex = True)
+    fig, ax = plt.subplots(figsize=figsize, nrows = 1, ncols = 1, sharex = True)
     ax.set_title('DeTrend RMSE per window size', fontsize = 20, fontweight = 'bold')
     ax.set_xlabel('Window size')
     ax.set_ylabel('RMSE')
@@ -245,7 +245,7 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
         if RMSE[i] == minValue:
             minIndex = i
     #plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
-    plt.figtext(0.45,  0.010, 'Minimal RMSE: {:.5f}, using Trend window of {} samples'.format(RMSE[minIndex], minIndex), size = 18, horizontalalignment = 'center')
+    plt.figtext(0.45,  -0.05, 'Minimal RMSE: {:.5f}, using Trend window of {} samples'.format(RMSE[minIndex], minIndex), size = 18, horizontalalignment = 'center')
     if saveImg:
         saveName = saveName if saveName else '{}_deTrendRMSE'.format(df[column].name)
         fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')

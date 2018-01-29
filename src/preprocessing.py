@@ -16,7 +16,7 @@ from neuralstocks.utils import *
 # <editor-fold> PARAMS
 dataPath = '/home/danilofrp/projeto_final/data'
 assetType = 'stocks'
-asset = 'ITUB4'
+asset = 'PETR4'
 frequency = 'diario'
 
 filePath = dataPath + '/' + assetType + '/' + asset + '/' + frequency + '/' + asset + '.CSV'
@@ -76,7 +76,7 @@ deTrend(df, column = 'PETR4_Close', window = 6, model = decomposeModel, fitOrder
 
 deSeason(df, column = 'Close', freq = 5, model = decomposeModel, plot = True, initialPlotDate = '2017', finalPlotDate = '2017', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
-deTrendRMSE(df[:'2016'], column = 'PETR4_Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 15, weightModel = None, saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+deTrendRMSE(df[:'2016'], column = 'PETR4_Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 15, figsize = (10,5), weightModel = None, saveImg = True, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
 deTrendRMSE(df[:'2016'], column = 'Close', model = decomposeModel, fitOrder = 1, windowMaxSize = 25, weightModel = 'full_pgram', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
@@ -300,3 +300,64 @@ _ , _ = scallingHistograms(df['Close_returns'], nBins = 50, showTestOnly = True)
 _ , _  = scallingHistograms(df['Close_resid'], nBins = 50, showTestOnly = True)
 
 # </editor-fold>
+
+
+
+import matplotlib.gridspec as gridspec
+
+def aux(df, column, figsize = (10,10), saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
+    df = df.dropna()
+    trendName = column + '_trend'
+    residName = column + '_resid'
+    plt.figure(figsize=figsize)
+    gs1 = gridspec.GridSpec(3, 1)
+    gs1.update(top=0.95, bottom=0.33)
+    ax1 = plt.subplot(gs1[0, :])
+    ax1.set_title('Observed')
+    ax1.set_ylabel('BRL')
+    ax1.plot(df[column])
+    ax1.set_xticklabels([])
+    ax1.grid()
+
+    ax2 = plt.subplot(gs1[1, :])
+    ax2.set_title('Trend Estimation')
+    ax2.set_ylabel('BRL')
+    ax2.plot(df[trendName])
+    ax2.set_xticklabels([])
+    ax2.grid()
+
+    ax3 = plt.subplot(gs1[2, :])
+    ax3.set_title('Residuals')
+    ax3.set_ylabel('Error (BRL)')
+    ax3.plot(df[residName])
+    ax3.set_xlabel('Date')
+    ax3.grid()
+
+    gs2 = gridspec.GridSpec(1, 1)
+    gs2.update(top=0.21, bottom=0.06)
+    ax4 = plt.subplot(gs2[0, :])
+    ax4.set_title('FFT')
+    ax4.set_xlabel('Freq')
+    ax4.set_ylabel('|X(freq)|')
+    ax4.grid()
+
+    Fs = 1.0;  # sampling rate
+    Ts = 1.0/Fs; # sampling interval
+    y = df[residName]
+    n = len(y) # lenght of the signal
+    k = np.arange(n)
+    T = n/Fs
+    frq = k/T # two sides frequency range
+    frq = frq[range(n/2)] # one side frequency range
+
+    Y = np.fft.fft(y)/n # fft computing and normalization
+    Y = Y[range(n/2)]
+
+    ax4.set_yscale('log')
+    ax4.plot(frq, abs(Y), 'r') # plotting the spectrum
+    ax4.set_xlabel('Freq')
+    ax4.set_ylabel('|X(freq)|')
+
+    plt.savefig('./{}.{}'.format('PETR4_Close_decompose_FFT', 'pdf'), bbox_inches='tight')
+
+aux(df, 'PETR4_Close')
