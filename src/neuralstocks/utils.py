@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys, os
 sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
@@ -144,12 +145,23 @@ def reconstructReturns(observed, predictedReturns):
 
 def calculateRMSE(s1, s2):
     if len(s1) != len(s2):
-        print 'Error: both series must have equal lenght'
+        print('Error: both series must have equal lenght')
     else:
         return np.sqrt(np.square(s1 - s2).sum()/len(s1))
 
 def calculateMAE(s1, s2):
     if len(s1) != len(s2):
-        print 'Error: both series must have equal lenght'
+        print('Error: both series must have equal lenght')
     else:
         return (np.abs(s1 - s2).sum())/len(s1)
+
+def setPaths(f):
+    dataPath = os.path.dirname(os.path.abspath(f)).split('neural-stocks', 1)[0] + 'data'
+    savePath = os.path.dirname(os.path.abspath(f)).replace('neural-stocks', 'ns-results')
+    saveFigPath = savePath + '/' + 'Figures'
+    saveVarPath = savePath + '/' + 'Variables'
+    saveModPath = savePath + '/' + 'Models'
+    if not os.path.exists(saveFigPath): os.makedirs(saveFigPath)
+    if not os.path.exists(saveVarPath): os.makedirs(saveVarPath)
+    if not os.path.exists(saveModPath): os.makedirs(saveModPath)
+    return dataPath, savePath

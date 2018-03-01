@@ -311,7 +311,7 @@ def aux(df, column, figsize = (10,10), saveImg = False, saveDir = '', saveName =
     residName = column + '_resid'
     plt.figure(figsize=figsize)
     gs1 = gridspec.GridSpec(3, 1)
-    gs1.update(top=0.95, bottom=0.33)
+    gs1.update(top=1, bottom=0.33)
     ax1 = plt.subplot(gs1[0, :])
     ax1.set_title('Observed')
     ax1.set_ylabel('BRL')
@@ -334,7 +334,7 @@ def aux(df, column, figsize = (10,10), saveImg = False, saveDir = '', saveName =
     ax3.grid()
 
     gs2 = gridspec.GridSpec(1, 1)
-    gs2.update(top=0.21, bottom=0.06)
+    gs2.update(top=0.20, bottom=0.00)
     ax4 = plt.subplot(gs2[0, :])
     ax4.set_title('FFT')
     ax4.set_xlabel('Freq')
@@ -360,4 +360,4 @@ def aux(df, column, figsize = (10,10), saveImg = False, saveDir = '', saveName =
 
     plt.savefig('./{}.{}'.format('PETR4_Close_decompose_FFT', 'pdf'), bbox_inches='tight')
 
-aux(df, 'PETR4_Close')
+aux(df, 'PETR4_Close', figsize = (10,10))
