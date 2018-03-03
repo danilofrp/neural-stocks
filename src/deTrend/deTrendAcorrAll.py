@@ -1,12 +1,12 @@
 # <editor-fold> IMPORTS
 from __future__ import print_function
 import sys, os
-sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
+sys.path.append('..')
 import multiprocessing
 from functools import partial
 from sklearn.externals import joblib
-from neuralstocks.deTrendSweeps import *
 from neuralstocks.utils import *
+from neuralstocks.deTrendSweeps import *
 from neuralstocks.preprocessing import *
 from messaging.telegrambot import Bot
 # </editor-fold>
