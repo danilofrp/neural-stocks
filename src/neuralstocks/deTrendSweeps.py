@@ -79,3 +79,29 @@ def deTrendAcorrGreedySearch(asset, dataPath, savePath, windowMinSize = 3, weigh
         bot.sendMessage(message, imgPath, filePath)
 
     return {'asset': asset, 'optimalTrendSamples': iMin, 'optimalAcorrSamples': jMin, 'optimalRMSE': minimal}
+
+def deTrendOptimal(asset, dataPath, savePath, bot = None):
+    filePath = dataPath + '/stocks/' + asset + '/diario/' + asset + '.CSV'
+    deTrendParams = joblib.load('{}/allAcorrSweepResults.pkl'.format(savePath + '/Variables'))[asset]
+    savePath = savePath.split('ns-results', 1)[0] + 'data/preprocessed/diario'
+
+    df = acquireData(filePath = filePath,
+                     replicateForHolidays = True,
+                     meanStdLen = 20,
+                     returnCalcParams = [['Close'], ['Close', 'Open'], ['High', 'Close' ], ['Low', 'Close']],
+                     EMAparams = [{'column': 'Close', 'lenght': 17},
+                                  {'column': 'Close', 'lenght': 72},
+                                  {'column': 'Close', 'lenght': 200},
+                                  {'column': 'Volume', 'lenght': 21}],
+                     MACDParams = [{'fast_lenght': 12, 'slow_lenght': 26, 'signal_lenght': 9}],
+                     BBParams = [{'lenght': 20}],
+                     OBVParams = [{'lenght': None}],
+                     deTrendParams = {'column': 'Close', 'window': deTrendParams['optimalTrendSamples'], 'model': 'additive', 'weightModel': 'window_acorr', 'weightModelWindow': deTrendParams['optimalAcorrSamples']},
+                     colPrefix = None,
+                     dropNan = False,
+                     force = True)
+
+    df.to_csv(path_or_buf = savePath + '/' + asset + '_prep.CSV')
+    if bot:
+        message  = '{} deTrend completed at {}'.format(asset, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        bot.sendMessage(message)
