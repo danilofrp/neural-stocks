@@ -84,7 +84,15 @@ def deTrendOptimal(asset, dataPath, savePath, bot = None):
     filePath = dataPath + '/stocks/' + asset + '/diario/' + asset + '.CSV'
     deTrendParams = joblib.load('{}/allAcorrSweepResults.pkl'.format(savePath + '/Variables'))[asset]
     savePath = savePath.split('ns-results', 1)[0] + 'ns-results/data/preprocessed/diario'
-    if not os.path.exists(savePath): os.makedirs(savePath)
+    # if not os.path.exists(savePath): os.makedirs(savePath)
+    try:
+        os.makedirs(savePath)
+        break
+    except OSError, e:
+        if e.errno != os.errno.EEXIST:
+            raise
+        # time.sleep might help here
+        pass
 
     df = acquireData(filePath = filePath,
                      replicateForHolidays = True,
