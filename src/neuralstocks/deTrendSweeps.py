@@ -83,7 +83,7 @@ def deTrendAcorrGreedySearch(asset, dataPath, savePath, windowMinSize = 3, weigh
 def deTrendOptimal(asset, dataPath, savePath, bot = None):
     filePath = dataPath + '/stocks/' + asset + '/diario/' + asset + '.CSV'
     deTrendParams = joblib.load('{}/allAcorrSweepResults.pkl'.format(savePath + '/Variables'))[asset]
-    savePath = savePath.split('ns-results', 1)[0] + 'data/preprocessed/diario'
+    savePath = savePath.split('ns-results', 1)[0] + 'ns-results/data/preprocessed/diario'
     if not os.path.exists(savePath): os.makedirs(savePath)
 
     df = acquireData(filePath = filePath,
