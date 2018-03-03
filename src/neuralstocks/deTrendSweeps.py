@@ -87,7 +87,6 @@ def deTrendOptimal(asset, dataPath, savePath, bot = None):
     # if not os.path.exists(savePath): os.makedirs(savePath)
     try:
         os.makedirs(savePath)
-        break
     except OSError, e:
         if e.errno != os.errno.EEXIST:
             raise
