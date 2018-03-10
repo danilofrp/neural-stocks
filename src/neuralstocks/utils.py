@@ -5,6 +5,7 @@ import numpy as np
 from pandas.core.nanops import nanmean as pd_nanmean
 from scipy.signal import periodogram
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 
 def getWeights(s, window, weightModel, weightModelWindow):
     if weightModel == 'full_pgram':
@@ -165,3 +166,22 @@ def setPaths(f):
     if not os.path.exists(saveVarPath): os.makedirs(saveVarPath)
     if not os.path.exists(saveModPath): os.makedirs(saveModPath)
     return dataPath, savePath
+
+def getSaveString(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, extra = None, dev = False):
+    return '{}/{}_{}_{}x{}x1_{}{}{}'.format(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, '_' + extra if (extra is not None and extra is not '') else '', '_dev' if dev else '')
+
+def normalizeData(data, norm, scaler = None):
+    '''
+        Method that preprocess data normalizing it according to 'norm' parameter.
+    '''
+    #normalize data based in train set
+    if not scaler:
+        if norm == 'mapstd':
+            scaler = StandardScaler().fit(data)
+        elif norm == 'mapstd_rob':
+            scaler = RobustScaler().fit(data)
+        elif norm == 'mapminmax':
+            scaler = MinMaxScaler(feature_range=(-1, 1)).fit(data)
+    norm_data = scaler.transform(data)
+
+    return norm_data, scaler

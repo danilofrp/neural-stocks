@@ -10,6 +10,7 @@ from sklearn.externals import joblib
 from neuralstocks.dataacquisition import *
 from neuralstocks.utils import *
 from neuralstocks.preprocessing import *
+# </editor-fold>
 
 def deTrendAcorrGreedySearch(asset, dataPath, savePath, windowMinSize = 3, weightModelWindowMinSize = 6, windowMaxSize = 25, weightModelWindowMaxSize = 150, bot = None, verbose = False, dev = False):
     saveVarPath = savePath + '/Variables'
@@ -105,7 +106,7 @@ def deTrendOptimal(asset, dataPath, savePath, bot = None):
                      BBParams = [{'lenght': 20}],
                      OBVParams = [{'lenght': None}],
                      deTrendParams = {'column': 'Close', 'window': deTrendParams['optimalTrendSamples'], 'model': 'additive', 'weightModel': 'window_acorr', 'weightModelWindow': deTrendParams['optimalAcorrSamples']},
-                     colPrefix = None,
+                     colPrefix = asset,
                      dropNan = False,
                      force = True)
 
