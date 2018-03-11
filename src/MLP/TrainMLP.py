@@ -22,8 +22,9 @@ from messaging.telegrambot import Bot
 # </editor-fold>
 
 stock = sys.argv[1]
+norm = sys.argv[2]
 # stock = 'PETR4'
-if len(sys.argv) > 2 and sys.argv[2] == '--dev':
+if len(sys.argv) > 3 and sys.argv[3] == '--dev':
     dev = True
 bot = Bot('neuralStocks')
 dataPath, savePath = setPaths(__file__)
@@ -32,7 +33,7 @@ dataPath, savePath = setPaths(__file__)
 savePath = savePath + '/' + stock
 pathIBOV = dataPath + '/indexes/IBOV/diario/IBOV.CSV'
 pathUSDBRL = dataPath + '/forex/USDBRL/diario/USDBRL.CSV'
-pathAsset = savePath.replace('src/MLP', 'data/preprocessed/diario/') + stock + '.CSV'
+pathAsset = savePath.replace('src/MLP', 'data/preprocessed/diario') + '.CSV'
 
 # loading the (already preprocessed) data
 ASSET = acquireData(filePath = pathAsset, dropNan = True)
@@ -62,7 +63,7 @@ xTrain, yTrain, xTest, yTest = prepData(df = df, columnsToUse = columnsToUse,
                                         columnToPredict = '{}_Close_resid'.format(stock), nDelays = 10,
                                         testSetSize = len(df['2017'])#, validationSplitSize = 0.15
                                        )
-norm = 'mapminmax'
+
 xTrainNorm, xScaler = utils.normalizeData(xTrain, norm)
 yTrainNorm, yScaler = utils.normalizeData(yTrain, norm)
 
