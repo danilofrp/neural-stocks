@@ -101,7 +101,8 @@ class MLP:
         return bestValLoss
 
 def trainRegressionMLP(neuronsInHiddenLayer, asset, savePath, X, y, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
-                       loss = 'MSE', optimizer = 'SGD', hiddenActivation = 'tanh', outputActivation = 'linear', patience = 25,  bot = None, dev = False):
+                       loss = 'MSE', optimizerAlgorithm = 'SGD', hiddenActivation = 'tanh', outputActivation = 'linear', patience = 25,
+                       bot = None, dev = False):
 
     analysisStr = 'MLP'
     saveFigPath = savePath + '/Figures'
@@ -114,6 +115,8 @@ def trainRegressionMLP(neuronsInHiddenLayer, asset, savePath, X, y, norm = 'mapm
 
     nInits = nInits if not dev else 1
     inputDim = X.shape[1]
+    if (optimizerAlgorithm.upper() == 'SGD'): optimizer = optimizers.SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+    elif (optimizerAlgorithm.upper() == 'ADAM'): optimizer = optimizers.Adam(lr=0.0001)
     earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
     modelCheckpoint = ModelCheckpoint('{}.h5'.format(getSaveString(saveModPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, dev = dev)),
                                       save_best_only=True)
