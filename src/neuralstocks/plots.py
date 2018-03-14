@@ -14,7 +14,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from scipy import signal
 from neuralstocks.utils import *
 
-def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', plotZeroLine = False, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
+def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', plotZeroLine = False, saveImg = False, saveDir = '', saveName = '', savePath = None, saveFormat = 'pdf'):
     """
     Plots the desired Series
 
@@ -33,7 +33,9 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
 
     saveDir: string, directory in wich to save generated plot
 
-    saveName : string, set of desired lenghts to calculate moving averages
+    saveName : string, name of the file to save
+
+    savePath: string, full path to save image. Overrides saveDir and SaveName
 
     saveFormat : string, saved image format. Default 'pdf'
     """
@@ -63,8 +65,9 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
     fig.autofmt_xdate()
     plt.legend()
     if saveImg:
-        saveName = saveName if saveName else '{}'.format(s[0].name)
-        fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+        saveName = saveName if saveName else '{}'.format(series[0].name)
+        savePath = savePath if savePath else '{}/{}.{}'.format(saveDir, saveName, saveFormat)
+        fig.savefig(savePath, bbox_inches='tight')
     return fig, ax
 
 def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):

@@ -25,8 +25,9 @@ from messaging.telegrambot import Bot
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
 @click.option('--verbose', is_flag = True, help = 'Verbosity flag.')
+@click.option('--msg/--no-msg', default = False, help = 'Disable telegram messaging.')
 @click.option('--dev', is_flag = True, help = 'Development flag, limits the number of datapoints to 400 and sets nInits to 1.')
-def main(asset, inits, norm, optimizer, verbose, dev):
+def main(asset, inits, norm, optimizer, verbose, msg, dev):
     bot = Bot('neuralStocks')
     dataPath, savePath = setPaths(__file__)
     # dataPath = '../data'
@@ -82,19 +83,35 @@ def main(asset, inits, norm, optimizer, verbose, dev):
     p.join()
 
     joblib.dump(results, '{}/{}/{}_modelsMSE{}.pkl'.format(savePath, 'Variables', asset, '_dev' if dev else ''))
-    bestModel = results.index(min(results)) + 1
-    joblib.dump(bestModel, '{}/{}/{}_bestModelNumberOfNeurons{}.pkl'.format(savePath, 'Variables', asset, '_dev' if dev else ''))
+    bestModelNumberOfNeurons = results.index(min(results)) + 1
+    joblib.dump(bestModelNumberOfNeurons, '{}/{}/{}_bestModelNumberOfNeurons{}.pkl'.format(savePath, 'Variables', asset, '_dev' if dev else ''))
 
+    bestModel = load_model(utils.getSaveString(savePath +'/Models', asset, 'regression_MLP', xTrain.shape[1], bestModelNumberOfNeurons, optimizer, norm, dev = dev) + '.h5')
+    predicted = yScaler.inverse_transform(bestModel.predict(xScaler.transform(xTest))).reshape(-1)
+    predictedResid = pd.Series(predicted, index = df['2017'].index, name = '{}_resid_predicted_MLP_{}'.format(asset, norm))
+    predictedSeries = pd.Series(df['{}_Close_trend'.format(asset)] +  predictedResid, name = '{}_Close_predicted_MLP_{}'.format(asset, norm))
 
-    t = datetime.now() - initTime
-    tStr = '{:02d}:{:02d}:{:02d}'.format(t.seconds//3600,(t.seconds//60)%60, t.seconds%60)
-    message1 = '{} regression MLP training completed. Time elapsed: {}'.format(asset, tStr)
-    message2 = 'The best model had {} neurons in the hidden layer.'.format(bestModel)
-    imgName = utils.getSaveString(savePath +'/Figures', asset, 'regression_MLP', xTrain.shape[1], bestModel, optimizer, norm, extra = 'fitHistory', dev = dev)
-    try:
-        bot.sendMessage([message1, message2], imgPath = imgName + '.png', filePath = imgName + '.pdf')
-    except Exception:
-        pass
+    plotSeries([df['{}_Close'.format(asset)], df['{}_Close_trend'.format(asset)], predictedSeries],
+               initialPlotDate = '2017', finalPlotDate = '2017',
+               title = 'Original Data vs Predicted', ylabel = 'Price',
+               saveImg = True, saveFormat = 'pdf',
+               savePath = '{}/{}_{}_{}_{}{}'.format(savePath + '/Figures', asset, 'regression_MLP', norm, 'predicted',  '_dev' if dev else ''))
+
+    df = pd.concat([df[['{}_Close'.format(asset), '{}_Close_trend'.format(asset), '{}_Close_resid'.format(asset)]], predictedResid, predictedSeries], axis = 1)
+    path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP/diario/', asset)
+    if not os.path.exists(path): os.makedirs(path)
+    df.to_csv('{}{}/{}/{}_predicted_MLP_{}{}.CSV'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP/diario', asset, asset, norm, '_dev' if dev else ''))
+
+    if (msg):
+        t = datetime.now() - initTime
+        tStr = '{:02d}:{:02d}:{:02d}'.format(t.seconds//3600,(t.seconds//60)%60, t.seconds%60)
+        message1 = '{} regression MLP training completed. Time elapsed: {}'.format(asset, tStr)
+        message2 = 'The best model had {} neurons in the hidden layer.'.format(bestModelNumberOfNeurons)
+        imgName = utils.getSaveString(savePath +'/Figures', asset, 'regression_MLP', xTrain.shape[1], bestModelNumberOfNeurons, optimizer, norm, extra = 'fitHistory', dev = dev)
+        try:
+            bot.sendMessage([message1, message2], imgPath = imgName + '.png', filePath = imgName + '.pdf')
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

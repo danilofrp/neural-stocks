@@ -101,7 +101,7 @@ class MLP:
         return bestValLoss
 
 def trainRegressionMLP(neuronsInHiddenLayer, asset, savePath, X, y, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
-                       loss = 'MSE', optimizerAlgorithm = 'SGD', hiddenActivation = 'tanh', outputActivation = 'linear', patience = 25,
+                       loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'linear', patience = 25,
                        verbose = False, dev = False):
 
     analysisStr = 'regression_MLP'
