@@ -159,16 +159,10 @@ def calculateMAE(s1, s2):
 def setPaths(f):
     dataPath = os.path.dirname(os.path.abspath(f)).split('neural-stocks', 1)[0] + 'data'
     savePath = os.path.dirname(os.path.abspath(f)).replace('neural-stocks', 'ns-results')
-    saveFigPath = savePath + '/' + 'Figures'
-    saveVarPath = savePath + '/' + 'Variables'
-    saveModPath = savePath + '/' + 'Models'
-    if not os.path.exists(saveFigPath): os.makedirs(saveFigPath)
-    if not os.path.exists(saveVarPath): os.makedirs(saveVarPath)
-    if not os.path.exists(saveModPath): os.makedirs(saveModPath)
     return dataPath, savePath
 
-def getSaveString(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, extra = None, dev = False):
-    return '{}/{}_{}_{}x{}x1_{}{}{}'.format(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, '_' + extra if (extra is not None and extra is not '') else '', '_dev' if dev else '')
+def getSaveString(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, extra = None, dev = False):
+    return '{}/{}_{}_{}x{}x1_{}_{}{}{}'.format(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, '_' + extra if (extra is not None and extra is not '') else '', '_dev' if dev else '')
 
 def normalizeData(data, norm, scaler = None):
     '''

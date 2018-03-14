@@ -38,7 +38,7 @@ class StackedAutoEncoder:
                  noveltyDetection=False, inovelty = 0, regression=False):
         self.trn_params       = params
         self.development_flag = development_flag
-        self.n_folds          = n_folds
+        self.n_folds          = n_foldsprint
         self.save_path        = save_path
         self.noveltyDetection = noveltyDetection
         self.regression       = regression

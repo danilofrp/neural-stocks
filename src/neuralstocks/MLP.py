@@ -75,7 +75,7 @@ class MLP:
         bestFitHistory = None
         fitData = {}
 
-        modelCheckpoint = ModelCheckpoint('{}.h5'.format(getSaveString(saveModPath, inputDim, neuronsInHiddenLayer, norm)),
+        modelCheckpoint = ModelCheckpoint('{}.h5'.format(getSaveString(saveModPath, inputDim, neuronsInHiddenLayer, optimizer, norm)),
                                           save_best_only=True)
         for init in range(nInits):
             m_time = time.time()
@@ -97,35 +97,40 @@ class MLP:
                 bestFitHistory = fitHistory
                 bestValLoss = min(fitHistory.history['val_loss'])
 
-        joblib.dump(bestFitHistory, utils.getSaveString(saveVarPath, inputDim, neuronsInHiddenLayer, norm, extra = 'fitHistory'))
+        joblib.dump(bestFitHistory, utils.getSaveString(saveVarPath, inputDim, neuronsInHiddenLayer, optimizer, norm, extra = 'fitHistory'))
         return bestValLoss
 
 def trainRegressionMLP(neuronsInHiddenLayer, asset, savePath, X, y, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
                        loss = 'MSE', optimizerAlgorithm = 'SGD', hiddenActivation = 'tanh', outputActivation = 'linear', patience = 25,
-                       bot = None, dev = False):
+                       verbose = False, dev = False):
 
-    analysisStr = 'MLP'
+    analysisStr = 'regression_MLP'
+
     saveFigPath = savePath + '/Figures'
     saveVarPath = savePath + '/Variables'
     saveModPath = savePath + '/Models'
-
     if not os.path.exists(saveVarPath): os.makedirs(saveVarPath)
     if not os.path.exists(saveFigPath): os.makedirs(saveFigPath)
     if not os.path.exists(saveModPath): os.makedirs(saveModPath)
 
     nInits = nInits if not dev else 1
+    X = X if not dev else X[-400:]
+    y = y if not dev else y[-400:]
     inputDim = X.shape[1]
     if (optimizerAlgorithm.upper() == 'SGD'): optimizer = optimizers.SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
     elif (optimizerAlgorithm.upper() == 'ADAM'): optimizer = optimizers.Adam(lr=0.0001)
     earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
-    modelCheckpoint = ModelCheckpoint('{}.h5'.format(getSaveString(saveModPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, dev = dev)),
+    modelCheckpoint = ModelCheckpoint('{}.h5'.format(getSaveString(saveModPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizerAlgorithm, norm, dev = dev)),
                                       save_best_only=True)
 
     bestValLoss = np.Inf
     bestFitHistory = None
 
+    initTime = time.time()
     for init in range(nInits):
-        m_time = time.time()
+        model = None # garantees model reset
+        iTime = time.time()
+        if verbose: print('Starting {} training ({:02d} neurons, init {})'.format(asset, neuronsInHiddenLayer, init))
         model = Sequential([Dense(neuronsInHiddenLayer, activation = hiddenActivation, input_dim = inputDim),
                             Dense(1, activation = outputActivation)
                            ])
@@ -143,20 +148,25 @@ def trainRegressionMLP(neuronsInHiddenLayer, asset, savePath, X, y, norm = 'mapm
         if min(fitHistory.history['val_loss']) < bestValLoss:
             bestValLoss = min(fitHistory.history['val_loss'])
             bestFitHistory = fitHistory.history
-    #end for nInits
 
-    joblib.dump(bestFitHistory, getSaveString(saveVarPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, extra = 'fitHistory', dev = dev) + '.pkl')
+        eTime = time.time()
+        if verbose: print('Finished {} training ({:02d} neurons, init {}) -> Ellapsed time: {:.3f} seconds'.format(asset, neuronsInHiddenLayer, init, eTime - iTime))
+    #end for nInits
+    endTime = time.time()
+    #if verbose: print('[-]Finished all {} trainings ({:02d} neurons) -> Ellapsed time: {:.3f} seconds'.format(asset, neuronsInHiddenLayer, endTime - initTime))
+
+    joblib.dump(bestFitHistory, getSaveString(saveVarPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizerAlgorithm, norm, extra = 'fitHistory', dev = dev) + '.pkl')
 
     fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
     ax.set_title('RMSE per epoch')
     ax.set_xlabel('Epoch')
     ax.set_ylabel('RMSE')
     ax.grid()
-    trainigSet, = ax.plot(np.sqrt(bestFitHistory['loss']), 'b', label = 'trainig set')
+    trainingSet, = ax.plot(np.sqrt(bestFitHistory['loss']), 'b', label = 'training set')
     validationSet, = ax.plot(np.sqrt(bestFitHistory['val_loss']), 'r', label = 'validation set')
-    plt.legend(handles=[trainigSet, validationSet], labels=['training set', 'validation set'], prop={'size': 18})
+    plt.legend(handles=[trainingSet, validationSet], labels=['training set', 'validation set'], prop={'size': 18})
     plt.figtext(0.5,  0.010, 'Lowest Validation RMSE: {:.5f}'.format(np.sqrt(min(bestFitHistory['val_loss']))), size = 18, horizontalalignment = 'center')
-    fig.savefig(getSaveString(saveFigPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, extra = 'fitHistory', dev = dev) + '.pdf', bbox_inches='tight')
-    fig.savefig(getSaveString(saveFigPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, norm, extra = 'fitHistory', dev = dev) + '.png', bbox_inches='tight')
+    fig.savefig(getSaveString(saveFigPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizerAlgorithm, norm, extra = 'fitHistory', dev = dev) + '.pdf', bbox_inches='tight')
+    fig.savefig(getSaveString(saveFigPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizerAlgorithm, norm, extra = 'fitHistory', dev = dev) + '.png', bbox_inches='tight')
 
     return bestValLoss

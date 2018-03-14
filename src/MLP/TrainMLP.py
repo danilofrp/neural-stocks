@@ -3,6 +3,7 @@ from __future__ import print_function
 import sys, os
 sys.path.append('..') #src directory
 #sys.path.append('./src') #dev src directory
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #disables tensorflow 'not compilet to instruction X' messages
 import time
 import click
 import numpy as np
@@ -23,8 +24,9 @@ from messaging.telegrambot import Bot
 @click.option('--inits', default = 1, help = 'Number of initializations for a single neural network topology. Default 1')
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
+@click.option('--verbose', is_flag = True, help = 'Verbosity flag.')
 @click.option('--dev', is_flag = True, help = 'Development flag, limits the number of datapoints to 400 and sets nInits to 1.')
-def main(asset, inits, norm, optimizer, dev):
+def main(asset, inits, norm, optimizer, verbose, dev):
     bot = Bot('neuralStocks')
     dataPath, savePath = setPaths(__file__)
     # dataPath = '../data'
@@ -71,8 +73,8 @@ def main(asset, inits, norm, optimizer, dev):
 
     initTime = datetime.now()
     # Start Parallel processing
-    func = partial(MLP.trainRegressionMLP, asset = asset, savePath = savePath, X = xTrainNorm, y = yTrainNorm, nInits = inits,
-                   optimizerAlgorithm = optimizer, dev = dev)
+    func = partial(MLP.trainRegressionMLP, asset = asset, savePath = savePath, X = xTrainNorm, y = yTrainNorm,
+                   norm = norm, nInits = inits, optimizerAlgorithm = optimizer, verbose = verbose, dev = dev)
     num_processes = multiprocessing.cpu_count()
     p = multiprocessing.Pool(processes=num_processes)
     results = p.map(func, nNeurons)
@@ -88,7 +90,7 @@ def main(asset, inits, norm, optimizer, dev):
     tStr = '{:02d}:{:02d}:{:02d}'.format(t.seconds//3600,(t.seconds//60)%60, t.seconds%60)
     message1 = '{} regression MLP training completed. Time elapsed: {}'.format(asset, tStr)
     message2 = 'The best model had {} neurons in the hidden layer.'.format(bestModel)
-    imgName = utils.getSaveString(savePath +'/Figures', asset, 'MLP', xTrain.shape[1], bestModel, norm, extra = 'fitHistory', dev = dev)
+    imgName = utils.getSaveString(savePath +'/Figures', asset, 'regression_MLP', xTrain.shape[1], bestModel, optimizer, norm, extra = 'fitHistory', dev = dev)
     try:
         bot.sendMessage([message1, message2], imgPath = imgName + '.png', filePath = imgName + '.pdf')
     except Exception:
