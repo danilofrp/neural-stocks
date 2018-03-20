@@ -32,10 +32,10 @@ def main(asset, inits, norm, optimizer, verbose, msg, dev):
     dataPath, savePath = setPaths(__file__)
     # dataPath = '../data'
     # savePath = '../ns-results/src/MLP/' + asset
-    savePath = savePath + '/' + asset
+    savePath = savePath + '/diario/' + asset
     pathIBOV = dataPath + '/indexes/IBOV/diario/IBOV.CSV'
     pathUSDBRL = dataPath + '/forex/USDBRL/diario/USDBRL.CSV'
-    pathAsset = savePath.replace('src/MLP', 'data/preprocessed/diario') + '.CSV'
+    pathAsset = savePath.replace('src/MLP', 'data/preprocessed') + '.CSV'
 
     # loading the (already preprocessed) data
     ASSET = acquireData(filePath = pathAsset, dropNan = True)
@@ -97,7 +97,8 @@ def main(asset, inits, norm, optimizer, verbose, msg, dev):
                saveImg = True, saveFormat = 'pdf',
                savePath = '{}/{}_{}_{}_{}{}'.format(savePath + '/Figures', asset, 'regression_MLP', norm, 'predicted',  '_dev' if dev else ''))
 
-    df = pd.concat([df[['{}_Close'.format(asset), '{}_Close_trend'.format(asset), '{}_Close_resid'.format(asset)]], predictedResid, predictedSeries], axis = 1)
+    df = pd.concat([df[['{}_Close'.format(asset), '{}_Open'.format(asset), '{}_High'.format(asset), '{}_Low'.format(asset), '{}_Volume'.format(asset),
+                        '{}_Close_trend'.format(asset), '{}_Close_resid'.format(asset)]], predictedResid, predictedSeries], axis = 1)
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP/diario/', asset)
     if not os.path.exists(path): os.makedirs(path)
     df.to_csv('{}{}/{}/{}_predicted_MLP_{}{}.CSV'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP/diario', asset, asset, norm, '_dev' if dev else ''))
