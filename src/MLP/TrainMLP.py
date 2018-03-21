@@ -25,7 +25,7 @@ from messaging.telegrambot import Bot
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
 @click.option('--verbose', is_flag = True, help = 'Verbosity flag.')
-@click.option('--msg/--no-msg', default = False, help = 'Disable telegram messaging.')
+@click.option('--msg/--no-msg', default = True, help = 'Disable telegram messaging.')
 @click.option('--dev', is_flag = True, help = 'Development flag, limits the number of datapoints to 400 and sets nInits to 1.')
 def main(asset, inits, norm, optimizer, verbose, msg, dev):
     bot = Bot('neuralStocks')
