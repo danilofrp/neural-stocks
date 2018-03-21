@@ -15,6 +15,7 @@ class Backtest:
         self.assets = assets
         self.dataPath = dataPath
         self.funds = initialFunds
+        self.initialFunds = initialFunds
         self.brokerage = brokerage
         self.transactionFees = transactionFees
         self.ISStax = ISStax
@@ -50,11 +51,12 @@ class Backtest:
                      parse_dates=['Date'], dayfirst=True, index_col='Date').sort_index()
             self.dailyData[asset] = df
 
-    def simulate(self, funds, strategy = 'buy-n-hold', start = None, end = None, longOnly = False, predicted = None, simulationName = None, verbose = 0):
+    def simulate(self, initialFunds, strategy = 'buy-n-hold', start = None, end = None, longOnly = False, predicted = None, simulationName = None, verbose = 0):
         simulationName = simulationName if simulationName else strategy
         print('Starting {} simulation with {}'.format(simulationName, self.assets))
         self.strategy = strategy
-        self.funds = funds
+        self.funds = initialFunds
+        self.initialFunds = initialFunds
         self.verbose = verbose
         if strategy == 'buy-n-hold':
             self.buyNHold(start, end)
@@ -63,7 +65,7 @@ class Backtest:
         elif strategy == 'predicted':
             if predicted:
                 for asset in self.assets:
-                    if not predicted[asset].any():
+                    if not asset in predicted:
                         print('Warning: No predictions for {}. This asset will be excluded from the simulation.'.format(asset))
                     else:
                         self.predictedValues[asset] = predicted[asset]
@@ -123,9 +125,9 @@ class Backtest:
                     print('{} - Skipped {}, no profit predicted'.format(date.strftime('%Y-%m-%d'), asset))
 
     def evaluateOperation(self, date, asset):
-        if  self.predictedValues[asset][date] > self.dailyData[asset]['Close'][:date][-2] + 0.05:
+        if  self.predictedValues[asset][date] > self.dailyData[asset]['Close'][:date][-2]:# + 0.05:
             return 'long'
-        elif self.predictedValues[asset][date] < self.dailyData[asset]['Close'][:date][-2] - 0.05:
+        elif self.predictedValues[asset][date] < self.dailyData[asset]['Close'][:date][-2]:# - 0.05:
             return 'short'
         else:
             return 'skip'
@@ -213,7 +215,7 @@ class Backtest:
             drawdown = (self.history[simulationName]['portfolioValue'] - np.maximum.accumulate(self.history[simulationName]['portfolioValue']))/np.maximum.accumulate(self.history[simulationName]['portfolioValue'])
             self.history[simulationName] = self.history[simulationName].assign(drawdown = drawdown)
 
-    def plotSimulations(self, simulations = None, names = None, title = None, ylabel = None, initialPlotDate = None, finalPlotDate = None, figsize = (10,6), legendsize = 12, linestyle = '-', linewidth = 2.0, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
+    def plotSimulations(self, simulations = None, names = None, title = None, ylabel = None, initialPlotDate = None, finalPlotDate = None, figsize = (10,6), legendsize = 12, linestyle = '-', linewidth = 2.0, legendncol = 3, saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
         if len(self.history) == 0:
             print('No saved simulations found!')
             return None
@@ -242,12 +244,11 @@ class Backtest:
             ax.set_xticks(xticks)
             xticklabels = [(d[0] + x).strftime('%Y-%m') for x in xticks.astype(int)]
             ax.set_xticklabels(xticklabels)
-        ax.plot(np.arange(len(s[initialPlotDate:finalPlotDate])), 100000 * np.ones(np.arange(len(s[initialPlotDate:finalPlotDate])).shape), 'k--', linewidth=linewidth)
+        ax.plot(np.arange(len(s[initialPlotDate:finalPlotDate])), self.initialFunds * np.ones(np.arange(len(s[initialPlotDate:finalPlotDate])).shape), 'k--', linewidth=linewidth)
         ax.autoscale(True, axis='x')
-        ax.grid()
         fig.autofmt_xdate()
-        #plt.legend(prop={'size': legendSize}, loc = 'best')
-        plt.legend(bbox_to_anchor=(0., 1.00, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0., prop={'size': legendsize}, frameon=False)
+        ax.grid()
+        plt.legend(bbox_to_anchor=(0., 1.00, 1., .102), loc=3, ncol=legendncol, mode="expand", borderaxespad=0., prop={'size': legendsize}, frameon=False)
         if saveImg:
             saveName = saveName if saveName else '{}'.format(s[0].name)
             fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
