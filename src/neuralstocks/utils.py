@@ -179,3 +179,12 @@ def normalizeData(data, norm, scaler = None):
     norm_data = scaler.transform(data)
 
     return norm_data, scaler
+
+def createPath(path):
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except OSError, e:
+            if e.errno != os.errno.EEXIST:
+                raise
+            pass

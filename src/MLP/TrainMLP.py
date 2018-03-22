@@ -25,7 +25,7 @@ from messaging.telegrambot import Bot
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
 @click.option('--verbose', is_flag = True, help = 'Verbosity flag.')
-@click.option('--msg/--no-msg', default = True, help = 'Disable telegram messaging.')
+@click.option('--msg/--no-msg', default = False, help = 'Enables/disables telegram messaging. Defalut False')
 @click.option('--dev', is_flag = True, help = 'Development flag, limits the number of datapoints to 400 and sets nInits to 1.')
 def main(asset, inits, norm, optimizer, verbose, msg, dev):
     bot = Bot('neuralStocks')
@@ -97,16 +97,28 @@ def main(asset, inits, norm, optimizer, verbose, msg, dev):
                saveImg = True, saveFormat = 'pdf',
                savePath = '{}/{}_{}_{}_{}{}'.format(savePath + '/Figures', asset, 'regression_MLP', norm, 'predicted',  '_dev' if dev else ''))
 
-    df = pd.concat([df[['{}_Close'.format(asset), '{}_Open'.format(asset), '{}_High'.format(asset), '{}_Low'.format(asset), '{}_Volume'.format(asset),
-                        '{}_Close_trend'.format(asset), '{}_Close_resid'.format(asset)]], predictedResid, predictedSeries], axis = 1)
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP/diario/', asset)
-    if not os.path.exists(path): os.makedirs(path)
-    df.to_csv('{}{}/{}/{}_predicted_MLP_{}{}.CSV'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP/diario', asset, asset, norm, '_dev' if dev else ''))
+    filePath = '{}/{}_predicted_MLP{}.CSV'.format(path, asset, '_dev' if dev else '')
+    if not os.path.exists(path) or not os.path.exists(filePath):
+        try:
+            os.makedirs(path)
+        except OSError, e:
+            if e.errno != os.errno.EEXIST:
+                raise
+            pass
+        df = pd.concat([df[['{}_Close'.format(asset), '{}_Open'.format(asset), '{}_High'.format(asset), '{}_Low'.format(asset), '{}_Volume'.format(asset),
+                            '{}_Close_trend'.format(asset), '{}_Close_resid'.format(asset)]], predictedResid, predictedSeries], axis = 1)
+        df.to_csv(filePath)
+    else:
+        df2 = pd.read_csv(filePath, parse_dates=['Date'], index_col='Date').sort_index()
+        df2.loc[:, predictedResid.name] = predictedResid
+        df2.loc[:, predictedSeries.name] = predictedSeries
+        df2.to_csv(filePath)
 
     if (msg):
         t = datetime.now() - initTime
         tStr = '{:02d}:{:02d}:{:02d}'.format(t.seconds//3600,(t.seconds//60)%60, t.seconds%60)
-        message1 = '{} regression MLP training completed. Time elapsed: {}'.format(asset, tStr)
+        message1 = '{} regression MLP ({}) training completed. Time elapsed: {}'.format(asset, norm, tStr)
         message2 = 'The best model had {} neurons in the hidden layer.'.format(bestModelNumberOfNeurons)
         imgName = utils.getSaveString(savePath +'/Figures', asset, 'regression_MLP', xTrain.shape[1], bestModelNumberOfNeurons, optimizer, norm, extra = 'fitHistory', dev = dev)
         try:

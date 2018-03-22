@@ -109,9 +109,9 @@ def trainRegressionMLP(neuronsInHiddenLayer, asset, savePath, X, y, norm = 'mapm
     saveFigPath = savePath + '/Figures'
     saveVarPath = savePath + '/Variables'
     saveModPath = savePath + '/Models'
-    if not os.path.exists(saveVarPath): os.makedirs(saveVarPath)
-    if not os.path.exists(saveFigPath): os.makedirs(saveFigPath)
-    if not os.path.exists(saveModPath): os.makedirs(saveModPath)
+    createPath(saveVarPath)
+    createPath(saveFigPath)
+    createPath(saveModPath)
 
     nInits = nInits if not dev else 1
     X = X if not dev else X[-400:]
