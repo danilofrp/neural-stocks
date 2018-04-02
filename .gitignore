@@ -1,5 +1,6 @@
 *.ipynb_checkpoints
 *.pyc
+*.py.swp
 
 /notebooks/Figures/*
 /notebooks/Variables/*
