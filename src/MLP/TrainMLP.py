@@ -6,10 +6,8 @@ sys.path.append('..') #src directory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #disables tensorflow 'not compilet to instruction X' messages
 import time
 import click
-import numpy as np
 import pandas as pd
 import multiprocessing
-import matplotlib.pyplot as plt
 from neuralstocks.dataacquisition import *
 from neuralstocks import MLP
 from neuralstocks import utils
@@ -19,23 +17,30 @@ from keras.models import load_model
 from messaging.telegrambot import Bot
 # </editor-fold>
 
+def trainWrapper(neurons, model, X, y, nInits, epochs, validationSplit, loss, optimizerAlgorithm, verbose, dev):
+    return model.train(X = X, y = y, hiddenLayers = neurons, nInits = nInits, epochs = epochs,
+                       validationSplit = validationSplit, loss = loss, optimizerAlgorithm = optimizerAlgorithm,
+                       verbose = verbose, dev = dev)
+
 @click.command()
 @click.option('--asset', help = 'Asset to run the analysis on.')
 @click.option('--inits', default = 1, help = 'Number of initializations for a single neural network topology. Default 1')
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
+@click.option('--loss', default = 'mse', help = 'Loss function to use for training. Default MSE')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
 @click.option('--verbose', is_flag = True, help = 'Verbosity flag.')
 @click.option('--msg/--no-msg', default = False, help = 'Enables/disables telegram messaging. Defalut False')
 @click.option('--dev', is_flag = True, help = 'Development flag, limits the number of datapoints to 400 and sets nInits to 1.')
-def main(asset, inits, norm, optimizer, verbose, msg, dev):
+def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     bot = Bot('neuralStocks')
     dataPath, savePath = setPaths(__file__)
+    savePath = savePath + '/diario/' + asset
     # dataPath = '../data'
     # savePath = '../ns-results/src/MLP/' + asset
-    savePath = savePath + '/diario/' + asset
     pathIBOV = dataPath + '/indexes/IBOV/diario/IBOV.CSV'
     pathUSDBRL = dataPath + '/forex/USDBRL/diario/USDBRL.CSV'
     pathAsset = savePath.replace('src/MLP', 'data/preprocessed') + '.CSV'
+    # pathAsset = savePath.replace('src/MLP', 'data/preprocessed/diario') + '.CSV'
 
     # loading the (already preprocessed) data
     ASSET = acquireData(filePath = pathAsset, dropNan = True)
@@ -69,14 +74,17 @@ def main(asset, inits, norm, optimizer, verbose, msg, dev):
     xTrainNorm, xScaler = utils.normalizeData(xTrain, norm)
     yTrainNorm, yScaler = utils.normalizeData(yTrain, norm)
 
+    # Creation MLP model:self
+    model = MLP.RegressionMLP(asset, savePath, dev)
+
     # training parameters
     nNeurons = range(1, xTrain.shape[1] + 1)
 
-    initTime = datetime.now()
     # Start Parallel processing
-    func = partial(MLP.trainRegressionMLP, asset = asset, savePath = savePath, X = xTrainNorm, y = yTrainNorm,
-                   norm = norm, nInits = inits, optimizerAlgorithm = optimizer, verbose = verbose, dev = dev)
+    initTime = datetime.now()
     num_processes = multiprocessing.cpu_count()
+    func = partial(trainWrapper, model = model, X = xTrainNorm, y = yTrainNorm, nInits = inits, epochs = 2000, validationSplit = 0.15,
+                                 loss = loss, optimizerAlgorithm = optimizer, verbose = verbose, dev = dev)
     p = multiprocessing.Pool(processes=num_processes)
     results = p.map(func, nNeurons)
     p.close()
@@ -90,12 +98,6 @@ def main(asset, inits, norm, optimizer, verbose, msg, dev):
     predicted = yScaler.inverse_transform(bestModel.predict(xScaler.transform(xTest))).reshape(-1)
     predictedResid = pd.Series(predicted, index = df['2017'].index, name = '{}_resid_predicted_MLP_{}'.format(asset, norm))
     predictedSeries = pd.Series(df['{}_Close_trend'.format(asset)] +  predictedResid, name = '{}_Close_predicted_MLP_{}'.format(asset, norm))
-
-    plotSeries([df['{}_Close'.format(asset)], df['{}_Close_trend'.format(asset)], predictedSeries],
-               initialPlotDate = '2017', finalPlotDate = '2017',
-               title = 'Original Data vs Predicted', ylabel = 'Price',
-               saveImg = True, saveFormat = 'pdf',
-               savePath = '{}/{}_{}_{}_{}{}'.format(savePath + '/Figures', asset, 'regression_MLP', norm, 'predicted',  '_dev' if dev else ''))
 
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP/diario/', asset)
     filePath = '{}/{}_predicted_MLP{}.CSV'.format(path, asset, '_dev' if dev else '')
