@@ -9,7 +9,7 @@ import click
 import pandas as pd
 import multiprocessing
 from neuralstocks.dataacquisition import *
-from neuralstocks import MLP
+from neuralstocks.models import RegressionMLP
 from neuralstocks import utils
 from functools import partial
 from sklearn.externals import joblib
@@ -75,7 +75,7 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     yTrainNorm, yScaler = utils.normalizeData(yTrain, norm)
 
     # Creation MLP model:self
-    model = MLP.RegressionMLP(asset, savePath, dev)
+    model = RegressionMLP(asset, savePath, dev)
 
     # training parameters
     nNeurons = range(1, xTrain.shape[1] + 1)
