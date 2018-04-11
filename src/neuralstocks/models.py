@@ -196,6 +196,7 @@ class RegressionSAE(BaseModel):
         nInits = nInits if not self.dev else 1
         X = X if not self.dev else X[-400:]
         y = y if not self.dev else y[-400:]
+        if self.verbose: print('Starting {} {} SAE ({}) training'.format(self.asset, self.getNeuronsString(), self.norm))
         self.model = Sequential()
 
         for i in range(len(hiddenLayers)):
