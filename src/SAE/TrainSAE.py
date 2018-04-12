@@ -78,7 +78,7 @@ def main(asset, inits, norm, loss, optimizer, force, verbose, msg, dev):
 
     # Start Parallel processing
     initTime = datetime.now()
-    minRMSE = model.train(X = xTrainNorm, y = yTrainNorm, hiddenLayers = hiddenLayers, nInits = inits,
+    minRMSE = model.train(X = xTrainNorm, y = yTrainNorm, hiddenLayers = hiddenLayers, norm = norm, nInits = inits,
                           loss = loss, optimizerAlgorithm = optimizer, force = force, verbose = verbose, dev = dev)
 
     finalModel = load_model(model.getSaveString(savePath +'/Models') + '.h5')
