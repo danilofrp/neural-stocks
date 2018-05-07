@@ -451,3 +451,22 @@ def estimatePDF(series, colors, nBins, overlap = True):
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles, labels, loc='best')
     return fig, ax
+
+def plotTimeSeriesCVA(CVA, columnName, title = 'Time Series Splits for Cross Validation', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):
+    initialPlotDate = CVA[0]['train'].index[0]
+    finalPlotDate = CVA[-1]['test'].index[-1]
+    fig, ax = plt.subplots(figsize=(10,2*len(CVA)), nrows = len(CVA), ncols = 1, sharex=True)
+    plt.xlabel('Date')
+    for i in range(len(CVA)):
+        fold = i + 1
+        ax[i].grid()
+        ax[i].plot(CVA[i]['train'][columnName], color = 'b', label = 'Train')
+        ax[i].plot(CVA[i]['validation'][columnName], color = 'r', label = 'Validation')
+        ax[i].plot(CVA[i]['test'][columnName], color = 'g', label = 'Test')
+        if i == 0:
+            ax[i].legend()
+            ax[i].set_title(title)
+    if saveImg:
+        saveName = saveName if saveName else title + '_' + columnName
+        savePath = '{}/{}.{}'.format(saveDir, saveName, saveFormat)
+        fig.savefig(savePath, bbox_inches='tight')

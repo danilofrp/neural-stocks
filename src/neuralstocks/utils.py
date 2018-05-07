@@ -161,9 +161,6 @@ def setPaths(f):
     savePath = os.path.dirname(os.path.abspath(f)).replace('neural-stocks', 'ns-results')
     return dataPath, savePath
 
-def getSaveString(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, extra = None, dev = False):
-    return '{}/{}_{}_{}x{}x1_{}_{}{}{}'.format(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, '_' + extra if (extra is not None and extra is not '') else '', '_dev' if dev else '')
-
 def normalizeData(data, norm, scaler = None):
     '''
         Method that preprocess data normalizing it according to 'norm' parameter.
@@ -188,3 +185,48 @@ def createPath(path):
             if e.errno != os.errno.EEXIST:
                 raise
             pass
+
+def customTimeSeriesSplit(df, nSplits, testStart = 2017, testEnd = 2017):
+    CVA = []
+    for n in range(nSplits):
+        CVA.append({'train': df[:str(testStart - (nSplits - n) - 1)], 'validation': df[str(testStart - (nSplits - n)):str(testStart - (nSplits - n))], 'test': df[str(testStart):str(testEnd)]})
+    return CVA
+
+def prepDataWithCrossValidation(df, columnsToUse, columnToPredict, nDelays, nSplits, testStart = 2017, testEnd = 2017):
+    x = []
+    y = []
+    for i in range(len(df)):
+        xAux = []
+        yAux = []
+        if i >= nDelays:
+            for column in columnsToUse:
+                if column == columnToPredict:
+                    xAux.extend(df[column][i - nDelays : i])
+                elif 'Holiday' in column:
+                    if df[column][i : i + 1].empty:
+                        xAux.extend([0])
+                    else:
+                        xAux.extend(df[column][i : i + 1])
+                else:
+                    xAux.extend(df[column][i - 1 : i])
+            yAux.append(df[columnToPredict][i])
+            x.append(xAux)
+            y.append(yAux)
+
+    testSize = len(df[str(testStart):str(testEnd)])
+    CVA = []
+    for n in range(nSplits):
+        trainStartIndex = 0
+        trainEndIndex = len(df[:str(testStart - (nSplits - n) - 1)]) - nDelays
+        validationStartIndex = trainEndIndex + 1
+        validationEndIndex = len(df[:str(testStart - (nSplits - n))]) - nDelays
+        CVA.append({
+                    'x_train': x[trainStartIndex : trainEndIndex + 1],
+                    'y_train': y[trainStartIndex : trainEndIndex + 1],
+                    'x_validation': x[validationStartIndex : validationEndIndex + 1],
+                    'y_validation': y[validationStartIndex : validationEndIndex + 1],
+                    'x_test': x[-testSize:],
+                    'y_test': y[-testSize:]
+                    })
+
+    return CVA
