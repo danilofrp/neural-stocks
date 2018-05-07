@@ -218,7 +218,7 @@ def prepDataWithCrossValidation(df, columnsToUse, columnToPredict, nDelays, nSpl
     for n in range(nSplits):
         trainStartIndex = 0
         trainEndIndex = len(df[:str(testStart - (nSplits - n) - 1)]) - nDelays
-        validationStartIndex = trainEndIndex + 1
+        validationStartIndex = trainEndIndex
         validationEndIndex = len(df[:str(testStart - (nSplits - n))]) - nDelays
         CVA.append({
                     'x_train': x[trainStartIndex : trainEndIndex],
