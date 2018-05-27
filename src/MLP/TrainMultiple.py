@@ -6,7 +6,7 @@ import click
 @click.option('--cv', is_flag=True)
 @click.option('--msg/--no-msg', default = False, help = 'Enables/disables telegram messaging. Defalut False')
 @click.option('--dev', is_flag = True, help = 'Development flag')
-def main(asset, msg, dev):
+def main(asset, cv, msg, dev):
     norms = ['mapminmax', 'mapstd']
     for a in asset:
         for norm in norms:
