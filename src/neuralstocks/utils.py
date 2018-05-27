@@ -166,16 +166,21 @@ def normalizeData(data, norm, scaler = None):
         Method that preprocess data normalizing it according to 'norm' parameter.
     '''
     #normalize data based in train set
+    returnScaler = False
     if not scaler:
+        returnScaler = True
         if norm == 'mapstd':
             scaler = StandardScaler().fit(data)
-        elif norm == 'mapstd_rob':
+        elif norm == 'mapstdrob':
             scaler = RobustScaler().fit(data)
         elif norm == 'mapminmax':
             scaler = MinMaxScaler(feature_range=(-1, 1)).fit(data)
     norm_data = scaler.transform(data)
 
-    return norm_data, scaler
+    if returnScaler:
+        return norm_data, scaler
+    else:
+        return norm_data
 
 def createPath(path):
     if not os.path.exists(path):
@@ -221,12 +226,29 @@ def prepDataWithCrossValidation(df, columnsToUse, columnToPredict, nDelays, nSpl
         validationStartIndex = trainEndIndex
         validationEndIndex = len(df[:str(testStart - (nSplits - n))]) - nDelays
         CVA.append({
-                    'x_train': x[trainStartIndex : trainEndIndex],
-                    'y_train': y[trainStartIndex : trainEndIndex],
-                    'x_validation': x[validationStartIndex : validationEndIndex],
-                    'y_validation': y[validationStartIndex : validationEndIndex],
-                    'x_test': x[-testSize:],
-                    'y_test': y[-testSize:]
+                    'x_train': np.array(x[trainStartIndex : trainEndIndex]),
+                    'y_train': np.array(y[trainStartIndex : trainEndIndex]),
+                    'x_validation': np.array(x[validationStartIndex : validationEndIndex]),
+                    'y_validation': np.array(y[validationStartIndex : validationEndIndex]),
+                    'x_test': np.array(x[-testSize:]),
+                    'y_test': np.array(y[-testSize:])
                     })
 
     return CVA
+
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = None
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout = self._original_stdout

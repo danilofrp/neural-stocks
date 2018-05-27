@@ -9,10 +9,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from neuralstocks.utils import *
 from sklearn.externals import joblib
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 from keras.models import Sequential, load_model
 from keras.layers import Dense
-from keras import optimizers
+from keras.optimizers import SGD, Adam
 from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras import backend as K
 # </editor-fold>
 
 class BaseModel:
@@ -25,6 +27,7 @@ class BaseModel:
     loss = ''
     metrics = []
     patience = 0
+    xScaler = None
     model = None
 
     def __init__(self, asset, savePath, verbose = False, dev = False):
@@ -41,7 +44,7 @@ class BaseModel:
         createPath(self.saveModPath)
 
     def setTrainParams(self, inputDim, hiddenLayers, outputDim = 1, norm = 'mapminmax', optimizerAlgorithm = 'SGD',
-                       hiddenActivation = 'tanh', outputActivation = 'linear', loss = 'mse', metrics = ['mae', 'acc'],
+                       hiddenActivation = 'tanh', outputActivation = 'linear', loss = 'mse', metrics = ['mae'],
                        validationSplit = 0.15, epochs = 2000, patience = 25, verbose = False, dev = False):
         if inputDim:             self.inputDim = inputDim
         if hiddenLayers:         self.hiddenLayers = hiddenLayers
@@ -55,13 +58,13 @@ class BaseModel:
         if validationSplit:      self.validationSplit = validationSplit
         if epochs:               self.epochs = epochs
         if patience:             self.patience = patience
-        if verbose:              self.verbose = verbose
-        if dev:                  self.dev = dev
+        if verbose != self.verbose:              self.verbose = verbose
+        if dev != self.dev:                  self.dev = dev
 
     def getSaveString(self, savePath, neuronsString = None, fold = None, extra = None):
         neuronsString = neuronsString if neuronsString else self.getNeuronsString()
         return '{}/{}_{}_{}_{}_{}{}{}{}'.format(savePath, self.asset, self.analysisStr, neuronsString, self.optimizerAlgorithm, self.norm,
-                                                '_' + fold if (fold is not None and fold is not '') else '', '_' + extra if (extra is not None and extra is not '') else '',
+                                                '_fold' + str(fold) if (fold is not None and fold is not '') else '', '_' + extra if (extra is not None and extra is not '') else '',
                                                 '_dev' if self.dev else '')
 
     def getNeuronsString(self):
@@ -74,10 +77,45 @@ class BaseModel:
         neuronsString += str(self.outputDim)
         return neuronsString
 
+    def normalizeInputData(data, norm, force = False):
+        '''
+            Method that preprocess data normalizing it according to 'norm' parameter.
+        '''
+        #normalize data based in train set
+        if (not self.xScaler) or force:
+            if norm == 'mapstd':
+                self.xScaler = StandardScaler().fit(data)
+            elif norm == 'mapstd_rob':
+                self.xScaler = RobustScaler().fit(data)
+            elif norm == 'mapminmax':
+                self.xScaler = MinMaxScaler(feature_range=(-1, 1)).fit(data)
+        norm_data = self.xScaler.transform(data)
+
+        return norm_data, xScaler
+
+    def normalizeOutputData(data, norm, force = False):
+        '''
+            Method that preprocess data normalizing it according to 'norm' parameter.
+        '''
+        #normalize data based in train set
+        if (not self.yScaler) or force:
+            if norm == 'mapstd':
+                self.yScaler = StandardScaler().fit(data)
+            elif norm == 'mapstd_rob':
+                self.yScaler = RobustScaler().fit(data)
+            elif norm == 'mapminmax':
+                self.yScaler = MinMayScaler(feature_range=(-1, 1)).fit(data)
+        norm_data = self.yScaler.transform(data)
+
+        return norm_data, yScaler
+
+    def denormalizeOutputData(data):
+        return self.yScaler.inverse_transform(data)
+
     @abc.abstractmethod
     def train(self, X, y, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
                     hiddenActivation = 'tanh', outputActivation = 'linear', loss = 'mse', optimizerAlgorithm = 'sgd',
-                    metrics = ['mae', 'acc'], patience = 25, verbose = False, dev = False):
+                    metrics = ['mae'], patience = 25, verbose = False, dev = False):
         '''
             Trains the model
 
@@ -105,7 +143,7 @@ class BaseModel:
 
             optimizerAlgorithm: string, optimizer algorithm to be used in training. Default SGD
 
-            metrics = string list, aditional metrics to evaluate over training. Default ['mae', 'acc']
+            metrics = string list, aditional metrics to evaluate over training. Default ['mae']
 
             patience: int, earlyStopping algorithm patience. Default 25 epochs
 
@@ -126,13 +164,13 @@ class RegressionMLP(BaseModel):
 
     def train(self, X, y, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
                     loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'linear',
-                    metrics = ['mae', 'acc'], patience = 25, verbose = False, dev = False):
+                    metrics = ['mae'], patience = 25, verbose = False, dev = False):
         self.setTrainParams(X.shape[1], hiddenLayers, y.shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
         nInits = nInits if not self.dev else 1
         X = X if not self.dev else X[-400:]
         y = y if not self.dev else y[-400:]
-        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = optimizers.SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
-        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = optimizers.Adam(lr=0.0001)
+        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.0001)
         earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
         modelCheckpoint = ModelCheckpoint('{}.h5'.format(self.getSaveString(self.saveModPath)), save_best_only=True)
 
@@ -183,16 +221,88 @@ class RegressionMLP(BaseModel):
 
         return bestValLoss
 
+    def trainWithCrossValidation(self, CVA, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
+                                 loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'linear',
+                                 metrics = ['mae'], patience = 25, verbose = False, dev = False):
+        self.setTrainParams(CVA[0]['x_train'].shape[1], hiddenLayers, CVA[0]['y_train'].shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
+        earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
+        nInits = nInits if not self.dev else 1
+
+        resultsArray = []
+        fold = 0;
+        for CVO in CVA:
+            results = {}
+            fold += 1
+            CVO['x_train'] = CVO['x_train'] if not self.dev else CVO['x_train'][-400:]
+            CVO['y_train'] = CVO['y_train'] if not self.dev else CVO['y_train'][-400:]
+            modelCheckpoint = ModelCheckpoint('{}.h5'.format(self.getSaveString(self.saveModPath, fold = fold)), save_best_only=True)
+
+            bestValLoss = np.Inf
+            bestFitHistory = None
+
+            initTime = time.time()
+            for init in range(nInits):
+                K.clear_session()
+                iTime = time.time()
+                if self.verbose: print('Starting {} training ({:02d} neurons, fold {}, init {})'.format(self.asset, self.hiddenLayers, fold, init))
+                if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+                elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.0001)
+                model = Sequential([Dense(self.hiddenLayers, activation = self.hiddenActivation, input_dim = self.inputDim),
+                                    Dense(1, activation = self.outputActivation)
+                                   ])
+                model.compile(optimizer = optimizer, loss = self.loss, metrics = self.metrics)
+
+                fitHistory = model.fit(CVO['x_train'],
+                                       CVO['y_train'],
+                                       epochs = epochs,
+                                       verbose = 0,
+                                       shuffle = False,
+                                       validation_data = (CVO['x_validation'], CVO['y_validation']),
+                                       callbacks = [modelCheckpoint,
+                                                    earlyStopping])
+
+                if min(fitHistory.history['val_loss']) < bestValLoss:
+                    bestValLoss = min(fitHistory.history['val_loss'])
+                    bestFitHistory = fitHistory.history
+
+                eTime = time.time()
+                if verbose: print('Finished {} training ({:02d} neurons, fold {}, init {}) -> Ellapsed time: {:.3f} seconds'.format(self.asset, self.hiddenLayers, fold, init, eTime - iTime))
+            #end for nInits
+            endTime = time.time()
+
+            joblib.dump(bestFitHistory, '{}.pkl'.format(self.getSaveString(self.saveVarPath, fold = fold, extra = 'fitHistory')))
+
+            fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
+            ax.set_title('RMSE per epoch')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('RMSE')
+            ax.grid()
+            trainingSet, = ax.plot(np.sqrt(bestFitHistory['loss']), 'b', label = 'Training set')
+            validationSet, = ax.plot(np.sqrt(bestFitHistory['val_loss']), 'r', label = 'Validation set')
+            plt.legend(handles=[trainingSet, validationSet], labels=['Training set', 'Validation set'], prop={'size': 18})
+            plt.figtext(0.5,  0.010, 'Lowest Validation RMSE: {:.5f}'.format(np.sqrt(min(bestFitHistory['val_loss']))), size = 18, horizontalalignment = 'center')
+            fig.savefig('{}.pdf'.format(self.getSaveString(self.saveFigPath, fold = fold, extra = 'fitHistory')), bbox_inches='tight')
+            fig.savefig('{}.png'.format(self.getSaveString(self.saveFigPath, fold = fold, extra = 'fitHistory')), bbox_inches='tight')
+            plt.close(fig)
+
+            model = load_model('{}.h5'.format(self.getSaveString(self.saveModPath, fold = fold)))
+            scores = model.evaluate(CVO['x_validation'], CVO['y_validation'], verbose = 0)
+            results['mse'] = scores[0]
+            results['mae'] = scores[1]
+            resultsArray.append(results)
+
+        return resultsArray
+
 class RegressionSAE(BaseModel):
     def __init__(self, asset, savePath, verbose = False, dev = False):
         BaseModel.__init__(self, asset, savePath, verbose, dev)
 
     def train(self, X, y, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
               loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'linear',
-              metrics = ['mae', 'acc'], patience = 25, verbose = False, force = False, dev = False):
+              metrics = ['mae'], patience = 25, verbose = False, force = False, dev = False):
         self.setTrainParams(X.shape[1], hiddenLayers, y.shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
-        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = optimizers.SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
-        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = optimizers.Adam(lr=0.0001)
+        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.0001)
         nInits = nInits if not self.dev else 1
         X = X if not self.dev else X[-400:]
         y = y if not self.dev else y[-400:]
@@ -248,10 +358,9 @@ class RegressionSAE(BaseModel):
 
         return min(np.sqrt(fitHistory.history['val_loss']))
 
-
     def trainLayer(self, X, nNeurons, nInits):
-        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = optimizers.SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
-        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = optimizers.Adam(lr=0.001)
+        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.001)
         earlyStopping = EarlyStopping(monitor = 'val_loss', patience = self.patience, mode='auto')
         neuronsString = '{:02d}x{:02d}x{:02d}'.format(X.shape[1], nNeurons, X.shape[1])
         modelCheckpoint = ModelCheckpoint('{}.h5'.format(self.getSaveString(self.saveModPath, neuronsString = neuronsString)), save_best_only=True)
@@ -323,8 +432,8 @@ def trainRegressionMLP(neuronsInHiddenLayer, X, y, norm = 'mapminmax', nInits = 
     X = X if not dev else X[-400:]
     y = y if not dev else y[-400:]
     inputDim = X.shape[1]
-    if (optimizerAlgorithm.upper() == 'SGD'): optimizer = optimizers.SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
-    elif (optimizerAlgorithm.upper() == 'ADAM'): optimizer = optimizers.Adam(lr=0.0001)
+    if (optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+    elif (optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.0001)
     earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
     modelCheckpoint = ModelCheckpoint('{}.h5'.format(getSaveString(saveModPath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizerAlgorithm, norm, dev = dev)),
                                       save_best_only=True)
