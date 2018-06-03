@@ -5,8 +5,13 @@ import os
 class Bot:
 
     def __init__(self, name, chat_id = None):
-        file_directory = '~/.telegramBots/{}.json'.format(name)
-        json_data=open(os.path.expanduser(file_directory), 'r').read()
+        home = os.path.expanduser('~')
+        if os.name == 'nt':
+            file_directory = home + '\\.telegramBots\\{}.json'
+        else:
+            file_directory = home + '/.telegramBots/{}.json'
+        file_directory = file_directory.format(name)
+        json_data=open(file_directory, 'r').read()
         data = json.loads(json_data)
 
         self.token = data['token']
