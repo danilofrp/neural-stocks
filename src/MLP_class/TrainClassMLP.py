@@ -17,8 +17,8 @@ from keras.models import load_model
 from messaging.telegrambot import Bot
 # </editor-fold>
 
-def trainWrapper(neurons, model, X, y, nInits, epochs, validationSplit, loss, optimizerAlgorithm, verbose, dev):
-    return model.train(X = X, y = y, hiddenLayers = neurons, nInits = nInits, epochs = epochs,
+def trainWrapper(neurons, model, X, y, norm, nInits, epochs, validationSplit, loss, optimizerAlgorithm, verbose, dev):
+    return model.train(X = X, y = y, hiddenLayers = neurons, norm = norm, nInits = nInits, epochs = epochs,
                        validationSplit = validationSplit, loss = loss, optimizerAlgorithm = optimizerAlgorithm,
                        verbose = verbose, dev = dev)
 
@@ -84,11 +84,11 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     # training parameters
     nNeurons = range(1, xTrain.shape[1] + 1)
 
-    #trainWrapper(10, model, xTrainNorm, yTrainNorm, inits, 2000, 0.15, loss, optimizer, verbose, dev)
+    #trainWrapper(10, model, xTrainNorm, yTrainNorm, norm, inits, 2000, 0.15, loss, optimizer, verbose, dev)
 
     # Start Parallel processing
     num_processes = multiprocessing.cpu_count()
-    func = partial(trainWrapper, model = model, X = xTrainNorm, y = yTrainNorm, nInits = inits, epochs = 2000, validationSplit = 0.15,
+    func = partial(trainWrapper, model = model, X = xTrainNorm, y = yTrainNorm, norm = norm, nInits = inits, epochs = 2000, validationSplit = 0.15,
                                  loss = loss, optimizerAlgorithm = optimizer, verbose = verbose, dev = dev)
     p = multiprocessing.Pool(processes=num_processes)
     results = p.map(func, nNeurons)
@@ -103,7 +103,6 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     bestModel = load_model(utils.getSaveString(savePath +'/Models', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, optimizer, norm, dev = dev) + '.h5')
     predicted = bestModel.predict(xScaler.transform(xTest)).ravel()
     predictedBin = pd.Series(predicted, index = df['2017'].index, name = '{}_bin_predicted_MLP_{}'.format(asset, norm))
-    print(predictedBin.head())
 
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP_class/diario/', asset)
     filePath = '{}/{}_bin_predicted_MLP{}.CSV'.format(path, asset, '_dev' if dev else '')

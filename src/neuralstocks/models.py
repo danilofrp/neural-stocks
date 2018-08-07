@@ -301,7 +301,7 @@ class ClassificationMLP(BaseModel):
         BaseModel.__init__(self, asset, savePath, verbose, dev)
 
     def train(self, X, y, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
-                    loss = 'binary_crossentropy', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'tanh',
+                    loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'tanh',
                     metrics = ['mae'], patience = 25, verbose = False, dev = False):
         self.setTrainParams(X.shape[1], hiddenLayers, y.shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
         nInits = nInits if not self.dev else 1
