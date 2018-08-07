@@ -11,9 +11,9 @@ def main(asset, cv, msg, dev):
     for a in asset:
         for norm in norms:
             if cv:
-                args = ['python', 'TrainMLPwithCV.py', '--asset={}'.format(a), '--inits=10', '--norm={}'.format(norm), '--optimizer=adam', '--verbose']
+                args = ['python', 'TrainMLPwithCV.py', '--asset={}'.format(a), '--inits=10', '--norm={}'.format(norm), '--outfunc=softmax', '--optimizer=adam', '--verbose']
             else:
-                args = ['python', 'TrainClassMLP.py', '--asset={}'.format(a), '--inits=10', '--norm={}'.format(norm), '--optimizer=adam', '--verbose']
+                args = ['python', 'TrainClassMLP.py', '--asset={}'.format(a), '--inits=10', '--norm={}'.format(norm), '--outfunc=softmax', '--optimizer=adam', '--verbose']
             args.append('--msg') if msg else args.append('--no-msg')
             if dev: args.append('--dev')
             #print args
