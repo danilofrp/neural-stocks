@@ -236,6 +236,24 @@ def prepDataWithCrossValidation(df, columnsToUse, columnToPredict, nDelays, nSpl
 
     return CVA
 
+def getSaveString(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, extra = None, dev = False):
+    return '{}/{}_{}_{}x{}x1_{}_{}{}{}'.format(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, '_' + extra if (extra is not None and extra is not '') else '', '_dev' if dev else '')
+
+def computeAccuracy(y_pred, y_true):
+    count = .0;
+    for i in range(len(y_true)):
+        if (np.sign(y_pred[i]) == np.sign(y_true[i])):
+            count += 1
+    return count/len(y_true)
+
+def computeLimiarAccuracy(y_pred, y_true, limiar = 0):
+    y_pred = [np.sign(y) if abs(y) >= limiar else 0 for y in y_pred]
+    nonzero_count = np.absolute(y_pred).sum()
+    count = .0
+    for i in range(len(y_true)):
+        if (y_pred[i] != 0 and y_pred[i] == np.sign(y_true[i])):
+            count += 1
+    return {'acc': count/nonzero_count, 'nonzero_count': nonzero_count}
 
 # Disable
 def blockPrint():
