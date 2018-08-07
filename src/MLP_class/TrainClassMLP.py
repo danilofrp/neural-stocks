@@ -103,6 +103,7 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     bestModel = load_model(utils.getSaveString(savePath +'/Models', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, optimizer, norm, dev = dev) + '.h5')
     predicted = bestModel.predict(xScaler.transform(xTest)).ravel()
     predictedBin = pd.Series(predicted, index = df['2017'].index, name = '{}_bin_predicted_MLP_{}'.format(asset, norm))
+    print(predictedBin.head())
 
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP_class/diario/', asset)
     filePath = '{}/{}_bin_predicted_MLP{}.CSV'.format(path, asset, '_dev' if dev else '')
@@ -114,7 +115,7 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
                 raise
             pass
         df = pd.concat([df[['{}_Close'.format(asset), '{}_Open'.format(asset), '{}_High'.format(asset), '{}_Low'.format(asset), '{}_Volume'.format(asset),
-                            '{}_Close_trend'.format(asset), '{}_Close_resid'.format(asset)]], predictedBin], axis = 1)
+                            '{}_Close/Open_returns'.format(asset)]], predictedBin], axis = 1)
         df.to_csv(filePath)
     else:
         df2 = pd.read_csv(filePath, parse_dates=['Date'], index_col='Date').sort_index()
