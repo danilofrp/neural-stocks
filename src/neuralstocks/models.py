@@ -321,7 +321,7 @@ class ClassificationMLP(BaseModel):
             iTime = time.time()
             if self.verbose: print('Starting {} training ({:02d} neurons, init {})'.format(self.asset, self.hiddenLayers, init))
             model = Sequential([Dense(self.hiddenLayers, activation = self.hiddenActivation, input_dim = self.inputDim),
-                                Dense(1, activation = self.outputActivation)
+                                Dense(self.outputDim, activation = self.outputActivation)
                                ])
             model.compile(optimizer = optimizer, loss = self.loss, metrics = self.metrics)
 

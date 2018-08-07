@@ -13,14 +13,16 @@ from neuralstocks.models import ClassificationMLP
 from neuralstocks import utils
 from functools import partial
 from sklearn.externals import joblib
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import accuracy_score
 from keras.models import load_model
 from messaging.telegrambot import Bot
 # </editor-fold>
 
-def trainWrapper(neurons, model, X, y, norm, nInits, epochs, validationSplit, loss, optimizerAlgorithm, verbose, dev):
+def trainWrapper(neurons, model, X, y, norm, nInits, epochs, validationSplit, loss, optimizerAlgorithm, outputActivation, verbose, dev):
     return model.train(X = X, y = y, hiddenLayers = neurons, norm = norm, nInits = nInits, epochs = epochs,
                        validationSplit = validationSplit, loss = loss, optimizerAlgorithm = optimizerAlgorithm,
-                       verbose = verbose, dev = dev)
+                       outputActivation = outputActivation, verbose = verbose, dev = dev)
 
 @click.command()
 @click.option('--asset', help = 'Asset to run the analysis on.')
@@ -28,10 +30,11 @@ def trainWrapper(neurons, model, X, y, norm, nInits, epochs, validationSplit, lo
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
 @click.option('--loss', default = 'binary_crossentropy', help = 'Loss function to use for training. Default Binary Crossentropy')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
+@click.option('--outfunc', default = 'tanh', help = 'Output activation function. Default tanh')
 @click.option('--verbose', is_flag = True, help = 'Verbosity flag.')
 @click.option('--msg/--no-msg', default = False, help = 'Enables/disables telegram messaging. Defalut False')
 @click.option('--dev', is_flag = True, help = 'Development flag, limits the number of datapoints to 400 and sets nInits to 1.')
-def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
+def main(asset, inits, norm, loss, optimizer, outfunc, verbose, msg, dev):
     initTime = datetime.now()
     bot = Bot('neuralStocks')
     dataPath, savePath = setPaths(__file__)
@@ -76,7 +79,12 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     yTest = np.sign(yTest)
 
     xTrainNorm, xScaler = utils.normalizeData(xTrain, norm)
-    yTrainNorm = yTrain
+    yTrainNorm = yTrain + np.ones(yTrain.shape)
+    yTestNorm = yTest + np.ones(yTest.shape)
+
+    oneHotEncoder = OneHotEncoder().fit(yTrainNorm)
+    yTrainNorm = oneHotEncoder.transform(yTrainNorm).toarray()
+    yTestNorm = oneHotEncoder.transform(yTestNorm).toarray()
 
     # Creation MLP model:self
     model = ClassificationMLP(asset, savePath, dev)
@@ -84,12 +92,12 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     # training parameters
     nNeurons = range(1, xTrain.shape[1] + 1)
 
-    #trainWrapper(10, model, xTrainNorm, yTrainNorm, norm, inits, 2000, 0.15, loss, optimizer, verbose, dev)
+    #trainWrapper(10, model, xTrainNorm, yTrainNorm, norm, inits, 2000, 0.15, loss, optimizer, outfunc, verbose, dev)
 
     # Start Parallel processing
     num_processes = multiprocessing.cpu_count()
     func = partial(trainWrapper, model = model, X = xTrainNorm, y = yTrainNorm, norm = norm, nInits = inits, epochs = 2000, validationSplit = 0.15,
-                                 loss = loss, optimizerAlgorithm = optimizer, verbose = verbose, dev = dev)
+                                 loss = loss, optimizerAlgorithm = optimizer, outputActivation = outfunc, verbose = verbose, dev = dev)
     p = multiprocessing.Pool(processes=num_processes)
     results = p.map(func, nNeurons)
     p.close()
@@ -100,9 +108,11 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
     #bestModelNumberOfNeurons = 10
     joblib.dump(bestModelNumberOfNeurons, '{}/{}/{}_bestModelNumberOfNeurons_class{}.pkl'.format(savePath, 'Variables', asset, '_dev' if dev else ''))
 
-    bestModel = load_model(utils.getSaveString(savePath +'/Models', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, optimizer, norm, dev = dev) + '.h5')
-    predicted = bestModel.predict(xScaler.transform(xTest)).ravel()
-    predictedBin = pd.Series(predicted, index = df['2017'].index, name = '{}_bin_predicted_MLP_{}'.format(asset, norm))
+    bestModel = load_model(utils.getSaveString(savePath +'/Models', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, yTrainNorm.shape[1], optimizer, norm, dev = dev) + '.h5')
+    predicted = bestModel.predict(xScaler.transform(xTest))
+    predictedCat = pd.DataFrame(predicted, index = df['2017'].index, columns = ['{}_down_predicted_MLP_{}'.format(asset, norm),
+                                                                                '{}_zero_predicted_MLP_{}'.format(asset, norm),
+                                                                                '{}_up_predicted_MLP_{}'.format(asset, norm)])
 
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP_class/diario/', asset)
     filePath = '{}/{}_bin_predicted_MLP{}.CSV'.format(path, asset, '_dev' if dev else '')
@@ -114,24 +124,29 @@ def main(asset, inits, norm, loss, optimizer, verbose, msg, dev):
                 raise
             pass
         df = pd.concat([df[['{}_Close'.format(asset), '{}_Open'.format(asset), '{}_High'.format(asset), '{}_Low'.format(asset), '{}_Volume'.format(asset),
-                            '{}_Close/Open_returns'.format(asset)]], predictedBin], axis = 1)
+                            '{}_Close/Open_returns'.format(asset)]], predictedCat], axis = 1)
         df.to_csv(filePath)
     else:
         df2 = pd.read_csv(filePath, parse_dates=['Date'], index_col='Date').sort_index()
-        df2.loc[:, predictedBin.name] = predictedBin
+        df2.loc[:, predictedCat.columns] = predictedCat
         df2.to_csv(filePath)
 
-    acc = computeAccuracy(predicted, yTest.ravel())
-    #print(yTest[:10].ravel())
-    #print(np.sign(predicted[:10]))
-    #print(acc)
+    predicted_decoded = []
+    for p in predicted:
+        if p[0] > p[1] and p[0] > p[2]:
+            predicted_decoded.append(-1)
+        if p[1] > p[0] and p[1] > p[2]:
+            predicted_decoded.append(0)
+        if p[2] > p[0] and p[2] > p[1]:
+            predicted_decoded.append(1)
+    acc = computeAccuracy(predicted_decoded, yTest.ravel())
 
     if (msg):
         t = datetime.now() - initTime
         tStr = '{:02d}:{:02d}:{:02d}'.format(t.seconds//3600,(t.seconds//60)%60, t.seconds%60)
         message1 = "{} classification MLP ({}) training completed. Time elapsed: {} \n\nAccuracy: {:.4f}".format(asset, norm, tStr, acc)
         message2 = 'The best model had {} neurons in the hidden layer.'.format(bestModelNumberOfNeurons)
-        imgName = utils.getSaveString(savePath +'/Figures', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, optimizer, norm, extra = 'fitHistory', dev = dev)
+        imgName = utils.getSaveString(savePath +'/Figures', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, yTrainNorm.shape[1], optimizer, norm, extra = 'fitHistory', dev = dev)
         try:
             bot.sendMessage([message1, message2], imgPath = imgName + '.png', filePath = imgName + '.pdf')
         except Exception:

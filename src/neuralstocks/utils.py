@@ -236,8 +236,8 @@ def prepDataWithCrossValidation(df, columnsToUse, columnToPredict, nDelays, nSpl
 
     return CVA
 
-def getSaveString(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, extra = None, dev = False):
-    return '{}/{}_{}_{}x{}x1_{}_{}{}{}'.format(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, optimizer, norm, '_' + extra if (extra is not None and extra is not '') else '', '_dev' if dev else '')
+def getSaveString(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, outputDim, optimizer, norm, extra = None, dev = False):
+    return '{}/{}_{}_{}x{}x{}_{}_{}{}{}'.format(savePath, asset, analysisStr, inputDim, neuronsInHiddenLayer, outputDim, optimizer, norm, '_' + extra if (extra is not None and extra is not '') else '', '_dev' if dev else '')
 
 def computeAccuracy(y_pred, y_true):
     count = .0;
