@@ -110,9 +110,7 @@ def main(asset, inits, norm, loss, optimizer, outfunc, verbose, msg, dev):
 
     bestModel = load_model(utils.getSaveString(savePath +'/Models', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, yTrainNorm.shape[1], optimizer, norm, dev = dev) + '.h5')
     predicted = bestModel.predict(xScaler.transform(xTest))
-    predictedCat = pd.DataFrame(predicted, index = df['2017'].index, columns = ['{}_down_predicted_MLP_{}'.format(asset, norm),
-                                                                                '{}_zero_predicted_MLP_{}'.format(asset, norm),
-                                                                                '{}_up_predicted_MLP_{}'.format(asset, norm)])
+    predictedCat = pd.DataFrame(predicted, index = df['2017'].index, columns = ['{}_down_predicted_MLP_{}'.format(asset, norm), '{}_zero_predicted_MLP_{}'.format(asset, norm), '{}_up_predicted_MLP_{}'.format(asset, norm)])
 
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP_class/diario/', asset)
     filePath = '{}/{}_bin_predicted_MLP{}.CSV'.format(path, asset, '_dev' if dev else '')
@@ -128,7 +126,8 @@ def main(asset, inits, norm, loss, optimizer, outfunc, verbose, msg, dev):
         df.to_csv(filePath)
     else:
         df2 = pd.read_csv(filePath, parse_dates=['Date'], index_col='Date').sort_index()
-        df2.loc[:, predictedCat.columns] = predictedCat
+        for column in predictedCat.columns:
+            df2.loc[:, column] = predictedCat[column]
         df2.to_csv(filePath)
 
     predicted_decoded = []
