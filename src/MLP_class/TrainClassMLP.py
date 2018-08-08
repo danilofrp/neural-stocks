@@ -28,7 +28,7 @@ def trainWrapper(neurons, model, X, y, norm, nInits, epochs, validationSplit, lo
 @click.option('--asset', help = 'Asset to run the analysis on.')
 @click.option('--inits', default = 1, help = 'Number of initializations for a single neural network topology. Default 1')
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
-@click.option('--loss', default = 'binary_crossentropy', help = 'Loss function to use for training. Default Binary Crossentropy')
+@click.option('--loss', default = 'categorical_crossentropy', help = 'Loss function to use for training. Default Categorical Crossentropy')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
 @click.option('--outfunc', default = 'tanh', help = 'Output activation function. Default tanh')
 @click.option('--verbose', is_flag = True, help = 'Verbosity flag.')

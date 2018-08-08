@@ -348,7 +348,7 @@ class ClassificationMLP(BaseModel):
         fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
         ax.set_title('Crossentropy per epoch')
         ax.set_xlabel('Epoch')
-        ax.set_ylabel('RMSE')
+        ax.set_ylabel('Crossentropy')
         ax.grid()
         trainingSet, = ax.plot(bestFitHistory['loss'], 'b', label = 'Training set')
         validationSet, = ax.plot(bestFitHistory['val_loss'], 'r', label = 'Validation set')
@@ -430,7 +430,6 @@ class ClassificationMLP(BaseModel):
             resultsArray.append(results)
 
         return resultsArray
-
 
 class RegressionSAE(BaseModel):
     def __init__(self, asset, savePath, verbose = False, dev = False):
@@ -516,6 +515,125 @@ class RegressionSAE(BaseModel):
                                 Dense(X.shape[1], activation = self.hiddenActivation)
                                ])
             model.compile(optimizer = optimizer, loss = self.loss, metrics = self.metrics)
+
+            fitHistory = model.fit(X,
+                                   X,
+                                   epochs = self.epochs,
+                                   verbose = 0,
+                                   shuffle = True,
+                                   validation_split = self.validationSplit,
+                                   callbacks = [modelCheckpoint,
+                                                earlyStopping])
+
+            if min(fitHistory.history['val_loss']) < bestValLoss:
+                bestValLoss = min(fitHistory.history['val_loss'])
+                bestFitHistory = fitHistory.history
+
+            eTime = time.time()
+            if self.verbose: print('Finished {} training ({} neurons, init {}) -> Ellapsed time: {:.3f} seconds'.format(self.asset, neuronsString, init, eTime - iTime))
+        #end for nInits
+        endTime = time.time()
+
+        joblib.dump(bestFitHistory, '{}.pkl'.format(self.getSaveString(self.saveVarPath, neuronsString = neuronsString, extra = 'fitHistory')))
+
+        fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
+        ax.set_title('RMSE per epoch')
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('RMSE')
+        ax.grid()
+        trainingSet, = ax.plot(np.sqrt(bestFitHistory['loss']), 'b', label = 'Training set')
+        validationSet, = ax.plot(np.sqrt(bestFitHistory['val_loss']), 'r', label = 'Validation set')
+        plt.legend(handles=[trainingSet, validationSet], labels=['Training set', 'Validation set'], prop={'size': 18})
+        plt.figtext(0.5,  0.010, 'Lowest Validation RMSE: {:.5f}'.format(np.sqrt(min(bestFitHistory['val_loss']))), size = 18, horizontalalignment = 'center')
+        fig.savefig('{}.pdf'.format(self.getSaveString(self.saveFigPath, neuronsString = neuronsString, extra = 'fitHistory')), bbox_inches='tight')
+        fig.savefig('{}.png'.format(self.getSaveString(self.saveFigPath, neuronsString = neuronsString, extra = 'fitHistory')), bbox_inches='tight')
+
+        return bestValLoss
+
+class ClassificationSAE(BaseModel):
+    def __init__(self, asset, savePath, verbose = False, dev = False):
+        BaseModel.__init__(self, asset, savePath, verbose, dev)
+
+    def train(self, X, y, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
+              loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'tanh',
+              metrics = ['mae'], patience = 25, verbose = False, force = False, dev = False):
+        self.setTrainParams(X.shape[1], hiddenLayers, y.shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
+        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.0001)
+        nInits = nInits if not self.dev else 1
+        X = X if not self.dev else X[-400:]
+        y = y if not self.dev else y[-400:]
+        if self.verbose: print('Starting {} {} SAE ({}) training'.format(self.asset, self.getNeuronsString(), self.norm))
+        self.model = Sequential()
+
+        for i in range(len(hiddenLayers)):
+            layerInputDim = X.shape[1] if i == 0 else hiddenLayers[i - 1]
+            nNeurons = hiddenLayers[i]
+            neuronsString = '{:02d}x{:02d}x{:02d}'.format(layerInputDim, nNeurons, layerInputDim)
+            earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
+            modelCheckpoint = ModelCheckpoint('{}.h5'.format(self.getSaveString(self.saveModPath)), save_best_only=True)
+
+            if (force or not os.path.exists('{}.h5'.format(self.getSaveString(self.saveModPath, neuronsString = neuronsString)))):
+                if self.verbose: print('Training SAE layer {} ({} autoencoder)'.format(i + 1, neuronsString))
+                xSet = X if i == 0 else self.model.predict(X)
+                self.trainLayer(xSet, nNeurons, nInits)
+            else:
+                if self.verbose: print ('Layer {} (autoencoder {}) was previously trained, loading existing model'.format(i + 1, neuronsString))
+
+            autoencoder = load_model('{}.h5'.format(self.getSaveString(self.saveModPath, neuronsString = neuronsString)))
+            encoderLayer = autoencoder.get_layer(index=1)
+            encoderLayer.trainable = False
+            self.model.add(encoderLayer)
+            self.model.compile(optimizer = optimizer, loss=loss)
+
+        self.model.add(Dense(self.outputDim, activation = self.outputActivation, name = 'output'))
+        self.model.compile(optimizer = optimizer, loss = self.loss, metrics = self.metrics)
+        if self.verbose: print('Training {} SAE ({}) output layer'.format(self.asset, self.getNeuronsString()))
+        iTime = time.time()
+        fitHistory = self.model.fit(X,
+                                    y,
+                                    epochs = self.epochs,
+                                    verbose = 0,
+                                    shuffle = True,
+                                    validation_split = self.validationSplit,
+                                    callbacks = [modelCheckpoint,
+                                                 earlyStopping])
+        if self.verbose: print('Finished {} training ({} SAE) -> Ellapsed time: {:.3f} seconds'.format(self.asset, self.getNeuronsString(), time.time() - iTime))
+        joblib.dump(fitHistory.history, '{}.pkl'.format(self.getSaveString(self.saveVarPath, extra = 'fitHistory')))
+
+        fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
+        ax.set_title('Crossentropy per epoch')
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Crossentropy')
+        ax.grid()
+        trainingSet, = ax.plot(fitHistory.history['loss'], 'b', label = 'Training set')
+        validationSet, = ax.plot(fitHistory.history['val_loss'], 'r', label = 'Validation set')
+        plt.legend(handles=[trainingSet, validationSet], labels=['Training set', 'Validation set'], prop={'size': 18})
+        plt.figtext(0.5,  0.010, 'Lowest Validation Crossentropy: {:.5f}'.format(min(fitHistory.history['val_loss'])), size = 18, horizontalalignment = 'center')
+        fig.savefig('{}.pdf'.format(self.getSaveString(self.saveFigPath, extra = 'fitHistory')), bbox_inches='tight')
+        fig.savefig('{}.png'.format(self.getSaveString(self.saveFigPath, extra = 'fitHistory')), bbox_inches='tight')
+
+        return min(fitHistory.history['val_loss'])
+
+    def trainLayer(self, X, nNeurons, nInits):
+        if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
+        elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.001)
+        earlyStopping = EarlyStopping(monitor = 'val_loss', patience = self.patience, mode='auto')
+        neuronsString = '{:02d}x{:02d}x{:02d}'.format(X.shape[1], nNeurons, X.shape[1])
+        modelCheckpoint = ModelCheckpoint('{}.h5'.format(self.getSaveString(self.saveModPath, neuronsString = neuronsString)), save_best_only=True)
+
+        bestValLoss = np.Inf
+        bestFitHistory = None
+
+        initTime = time.time()
+        for init in range(1, nInits + 1):
+            model = None # garantees model reset
+            iTime = time.time()
+            if self.verbose: print('Starting {} training ({} neurons, init {})'.format(self.asset, neuronsString, init))
+            model = Sequential([Dense(nNeurons, activation = self.hiddenActivation, input_dim = X.shape[1], name = 'dense_{}x{}'.format(X.shape[1], nNeurons)),
+                                Dense(X.shape[1], activation = self.hiddenActivation)
+                               ])
+            model.compile(optimizer = optimizer, loss = 'mse', metrics = self.metrics)
 
             fitHistory = model.fit(X,
                                    X,
