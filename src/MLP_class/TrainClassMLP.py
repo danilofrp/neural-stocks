@@ -28,7 +28,7 @@ def trainWrapper(neurons, model, X, y, norm, nInits, epochs, validationSplit, lo
 @click.option('--asset', help = 'Asset to run the analysis on.')
 @click.option('--inits', default = 1, help = 'Number of initializations for a single neural network topology. Default 1')
 @click.option('--norm', default = 'mapminmax', help = 'Normalization technique to use. Default mapminmax')
-@click.option('--loss', default = 'categorical_crossentropy', help = 'Loss function to use for training. Default Categorical Crossentropy')
+@click.option('--loss', default = 'mse', help = 'Loss function to use for training. Default Categorical Crossentropy')
 @click.option('--optimizer', default = 'sgd', help = 'Optimizer alorithm to use for training. Default SGD')
 @click.option('--outfunc', default = 'tanh', help = 'Output activation function. Default tanh')
 @click.option('--verbose', is_flag = True, help = 'Verbosity flag.')
@@ -69,22 +69,18 @@ def main(asset, inits, norm, loss, optimizer, outfunc, verbose, msg, dev):
     for i in range(len(columnsToUse)):
         columnsToUse[i] = columnsToUse[i].format(asset)
 
+    df = getBinaryReturns(df, '{}_Close/Open_returns'.format(asset), asset)
+
     # creating the train and test sets
     xTrain, yTrain, xTest, yTest = prepData(df = df, columnsToUse = columnsToUse,
-                                            columnToPredict = '{}_Close/Open_returns'.format(asset), nDelays = 11,
+                                            columnToPredict = '{}_bin_returns'.format(asset),
+                                            columnToDelay = '{}_Close/Open_returns'.format(asset), nDelays = 11,
                                             testSetSize = len(df['2017'])#, validationSplitSize = 0.15
                                            )
 
-    yTrain = np.sign(yTrain)
-    yTest = np.sign(yTest)
-
     xTrainNorm, xScaler = utils.normalizeData(xTrain, norm)
-    yTrainNorm = yTrain + np.ones(yTrain.shape)
-    yTestNorm = yTest + np.ones(yTest.shape)
-
-    oneHotEncoder = OneHotEncoder().fit(yTrainNorm)
-    yTrainNorm = oneHotEncoder.transform(yTrainNorm).toarray()
-    yTestNorm = oneHotEncoder.transform(yTestNorm).toarray()
+    yTrainNorm = yTrain
+    yTestNorm = yTest
 
     # Creation MLP model:self
     model = ClassificationMLP(asset, savePath, dev)
@@ -103,14 +99,14 @@ def main(asset, inits, norm, loss, optimizer, outfunc, verbose, msg, dev):
     p.close()
     p.join()
 
-    joblib.dump(results, '{}/{}/{}_modelsCrooesntropy{}.pkl'.format(savePath, 'Variables', asset, '_dev' if dev else ''))
+    joblib.dump(results, '{}/{}/{}_modelsRMSE{}.pkl'.format(savePath, 'Variables', asset, '_dev' if dev else ''))
     bestModelNumberOfNeurons = results.index(min(results)) + 1
     #bestModelNumberOfNeurons = 10
     joblib.dump(bestModelNumberOfNeurons, '{}/{}/{}_bestModelNumberOfNeurons_class{}.pkl'.format(savePath, 'Variables', asset, '_dev' if dev else ''))
 
     bestModel = load_model(utils.getSaveString(savePath +'/Models', asset, 'ClassificationMLP', xTrain.shape[1], bestModelNumberOfNeurons, yTrainNorm.shape[1], optimizer, norm, dev = dev) + '.h5')
     predicted = bestModel.predict(xScaler.transform(xTest))
-    predictedCat = pd.DataFrame(predicted, index = df['2017'].index, columns = ['{}_down_predicted_MLP_{}'.format(asset, norm), '{}_zero_predicted_MLP_{}'.format(asset, norm), '{}_up_predicted_MLP_{}'.format(asset, norm)])
+    predictedBin = pd.DataFrame(predicted, index = df['2017'].index, columns = ['{}_bin_predicted_MLP_{}'.format(asset, norm)])
 
     path = '{}{}{}'.format(pathAsset.split('preprocessed')[0], 'predicted/MLP_class/diario/', asset)
     filePath = '{}/{}_bin_predicted_MLP{}.CSV'.format(path, asset, '_dev' if dev else '')
@@ -122,23 +118,15 @@ def main(asset, inits, norm, loss, optimizer, outfunc, verbose, msg, dev):
                 raise
             pass
         df = pd.concat([df[['{}_Close'.format(asset), '{}_Open'.format(asset), '{}_High'.format(asset), '{}_Low'.format(asset), '{}_Volume'.format(asset),
-                            '{}_Close/Open_returns'.format(asset)]], predictedCat], axis = 1)
+                            '{}_Close/Open_returns'.format(asset), '{}_bin_returns'.format(asset)]], predictedBin], axis = 1)
         df.to_csv(filePath)
     else:
         df2 = pd.read_csv(filePath, parse_dates=['Date'], index_col='Date').sort_index()
-        for column in predictedCat.columns:
-            df2.loc[:, column] = predictedCat[column]
+        for column in predictedBin.columns:
+            df2.loc[:, column] = predictedBin[column]
         df2.to_csv(filePath)
 
-    predicted_decoded = []
-    for p in predicted:
-        if p[0] > p[1] and p[0] > p[2]:
-            predicted_decoded.append(-1)
-        if p[1] > p[0] and p[1] > p[2]:
-            predicted_decoded.append(0)
-        if p[2] > p[0] and p[2] > p[1]:
-            predicted_decoded.append(1)
-    acc = computeAccuracy(predicted_decoded, yTest.ravel())
+    acc = computeAccuracy(predicted, yTest.ravel())
 
     if (msg):
         t = datetime.now() - initTime

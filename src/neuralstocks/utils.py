@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys, os
 sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
 import numpy as np
+from random import randint
 from pandas.core.nanops import nanmean as pd_nanmean
 from scipy.signal import periodogram
 from sklearn.model_selection import train_test_split
@@ -95,7 +96,8 @@ def KLDiv(p, q, nBins = 100, bins = np.array([-1,0, 1])):
 
 sign = lambda a: int(a>0) - int(a<0)
 
-def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize, validationSplitSize = None):
+def prepData(df, columnsToUse, columnToPredict, columnToDelay = None, nDelays = 10, testSetSize = 200, validationSplitSize = None):
+    if columnToDelay is None: columnToDelay = columnToPredict
     xTrain = []
     yTrain = []
     xTest = []
@@ -107,7 +109,7 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize, validation
         yTestAux = []
         if i >= nDelays and (i < (len(df) - testSetSize)):
             for column in columnsToUse:
-                if column == columnToPredict:
+                if column == columnToDelay:
                     xTrainAux.extend(df[column][i - nDelays : i])
                 elif 'Holiday' in column:
                     if df[column][i : i + 1].empty:
@@ -121,7 +123,7 @@ def prepData(df, columnsToUse, columnToPredict, nDelays, testSetSize, validation
             yTrain.append(yTrainAux)
         elif i >= nDelays and (i >= (len(df) - testSetSize)):
             for column in columnsToUse:
-                if column == columnToPredict:
+                if column == columnToDelay:
                     xTestAux.extend(df[column][i - nDelays : i])
                 elif 'Holiday' in column:
                     if df[column][i : i + 1].empty:
@@ -254,6 +256,42 @@ def computeLimiarAccuracy(y_pred, y_true, limiar = 0):
         if (y_pred[i] != 0 and y_pred[i] == np.sign(y_true[i])):
             count += 1
     return {'acc': count/nonzero_count, 'nonzero_count': nonzero_count}
+
+def getBinaryReturns(df, return_col, asset):
+    bin_col = '{}_bin_returns'.format(asset)
+    return_col = return_col.format(asset)
+    close_col = '{}_Close'.format(asset)
+    high_col = '{}_High'.format(asset)
+    low_col = '{}_Low'.format(asset)
+    df[bin_col] = 0
+    high_amplitude = df[high_col] - df[close_col]
+    low_amplitude = df[close_col] - df[low_col]
+    for i in df.index:
+        if (df[return_col][i] != 0):
+            df.at[i, bin_col] = np.sign(df[return_col][i])
+        else:
+            if (high_amplitude[i] > low_amplitude[i]):
+                df.at[i, bin_col] = 1
+            elif (high_amplitude[i] < low_amplitude[i]):
+                df.at[i, bin_col] = -1
+            else:
+                df.at[i, bin_col] = -1 + 2*randint(0, 1)
+    return df
+
+def getGradientWeights(y_train):
+    """Calculate values for weighting the loss function for each class.
+
+       Args:
+           y_train: array containing the target values that will be used
+           for training
+       Returns:
+           dictionary mapping class indices to a weight for each class
+    """
+    cls_indices, event_count = np.unique(np.array(y_train), return_counts=True)
+    min_class = min(event_count)
+    return {cls_index: float(min_class) / cls_count
+            for cls_index, cls_count in zip(cls_indices, event_count)}
+
 
 # Disable
 def blockPrint():

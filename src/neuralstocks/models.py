@@ -69,7 +69,6 @@ class BaseModel:
         #print('Model will be saved in:' + savestring)
         return savestring
 
-
     def getNeuronsString(self):
         neuronsString = str(self.inputDim) + 'x'
         if (isinstance(self.hiddenLayers, list)):
@@ -302,7 +301,7 @@ class ClassificationMLP(BaseModel):
 
     def train(self, X, y, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
                     loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'tanh',
-                    metrics = ['mae'], patience = 25, verbose = False, dev = False):
+                    metrics = ['acc'], patience = 25, verbose = False, dev = False):
         self.setTrainParams(X.shape[1], hiddenLayers, y.shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
         nInits = nInits if not self.dev else 1
         X = X if not self.dev else X[-400:]
@@ -311,6 +310,7 @@ class ClassificationMLP(BaseModel):
         elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.0001)
         earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
         modelCheckpoint = ModelCheckpoint('{}.h5'.format(self.getSaveString(self.saveModPath)), save_best_only=True)
+        class_weights = getGradientWeights(y)
 
         bestValLoss = np.Inf
         bestFitHistory = None
@@ -327,10 +327,11 @@ class ClassificationMLP(BaseModel):
 
             fitHistory = model.fit(X,
                                    y,
-                                   epochs = epochs,
+                                   epochs = self.epochs,
                                    verbose = 0,
                                    shuffle = True,
-                                   validation_split = validationSplit,
+                                   validation_split = self.validationSplit,
+                                   class_weight = class_weights,
                                    callbacks = [modelCheckpoint,
                                                 earlyStopping])
 
@@ -346,22 +347,22 @@ class ClassificationMLP(BaseModel):
         joblib.dump(bestFitHistory, '{}.pkl'.format(self.getSaveString(self.saveVarPath, extra = 'fitHistory')))
 
         fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
-        ax.set_title('Crossentropy per epoch')
+        ax.set_title('RMSE per epoch')
         ax.set_xlabel('Epoch')
-        ax.set_ylabel('Crossentropy')
+        ax.set_ylabel('RMSE')
         ax.grid()
-        trainingSet, = ax.plot(bestFitHistory['loss'], 'b', label = 'Training set')
-        validationSet, = ax.plot(bestFitHistory['val_loss'], 'r', label = 'Validation set')
+        trainingSet, = ax.plot(np.sqrt(bestFitHistory['loss']), 'b', label = 'Training set')
+        validationSet, = ax.plot(np.sqrt(bestFitHistory['val_loss']), 'r', label = 'Validation set')
         plt.legend(handles=[trainingSet, validationSet], labels=['Training set', 'Validation set'], prop={'size': 18})
-        plt.figtext(0.5,  0.010, 'Lowest Validation Crossentropy: {:.5f}'.format(min(bestFitHistory['val_loss'])), size = 18, horizontalalignment = 'center')
+        plt.figtext(0.5,  0.010, 'Lowest Validation RMSE: {:.5f}'.format(np.sqrt(min(bestFitHistory['val_loss']))), size = 18, horizontalalignment = 'center')
         fig.savefig('{}.pdf'.format(self.getSaveString(self.saveFigPath, extra = 'fitHistory')), bbox_inches='tight')
         fig.savefig('{}.png'.format(self.getSaveString(self.saveFigPath, extra = 'fitHistory')), bbox_inches='tight')
 
-        return bestValLoss
+        return np.sqrt(bestValLoss)
 
     def trainWithCrossValidation(self, CVA, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
-                                 loss = 'binary_crossentropy', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'tanh',
-                                 metrics = ['mae'], patience = 25, verbose = False, dev = False):
+                                 loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'tanh',
+                                 metrics = ['acc'], patience = 25, verbose = False, dev = False):
         self.setTrainParams(CVA[0]['x_train'].shape[1], hiddenLayers, CVA[0]['y_train'].shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
         earlyStopping = EarlyStopping(monitor = 'val_loss', patience = patience, mode='auto')
         nInits = nInits if not self.dev else 1
@@ -411,7 +412,7 @@ class ClassificationMLP(BaseModel):
             joblib.dump(bestFitHistory, '{}.pkl'.format(self.getSaveString(self.saveVarPath, fold = fold, extra = 'fitHistory')))
 
             fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
-            ax.set_title('Crossentropy per epoch')
+            ax.set_title('RMSE per epoch')
             ax.set_xlabel('Epoch')
             ax.set_ylabel('RMSE')
             ax.grid()
@@ -556,10 +557,12 @@ class ClassificationSAE(BaseModel):
 
     def train(self, X, y, hiddenLayers, norm = 'mapminmax', nInits = 1, epochs = 2000, validationSplit = 0.15,
               loss = 'mse', optimizerAlgorithm = 'sgd', hiddenActivation = 'tanh', outputActivation = 'tanh',
-              metrics = ['mae'], patience = 25, verbose = False, force = False, dev = False):
+              metrics = ['acc'], patience = 25, verbose = False, force = False, dev = False):
         self.setTrainParams(X.shape[1], hiddenLayers, y.shape[1], norm, optimizerAlgorithm, hiddenActivation, outputActivation, loss, metrics, validationSplit, epochs, patience, verbose, dev)
         if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)
         elif (self.optimizerAlgorithm.upper() == 'ADAM'): optimizer = Adam(lr=0.0001)
+        class_weights = getGradientWeights(y)
+
         nInits = nInits if not self.dev else 1
         X = X if not self.dev else X[-400:]
         y = y if not self.dev else y[-400:]
@@ -596,24 +599,26 @@ class ClassificationSAE(BaseModel):
                                     verbose = 0,
                                     shuffle = True,
                                     validation_split = self.validationSplit,
+                                    class_weight = class_weights,
                                     callbacks = [modelCheckpoint,
                                                  earlyStopping])
+
         if self.verbose: print('Finished {} training ({} SAE) -> Ellapsed time: {:.3f} seconds'.format(self.asset, self.getNeuronsString(), time.time() - iTime))
         joblib.dump(fitHistory.history, '{}.pkl'.format(self.getSaveString(self.saveVarPath, extra = 'fitHistory')))
 
         fig, ax = plt.subplots(figsize = (10,10), nrows = 1, ncols = 1)
-        ax.set_title('Crossentropy per epoch')
+        ax.set_title('RMSE per epoch')
         ax.set_xlabel('Epoch')
-        ax.set_ylabel('Crossentropy')
+        ax.set_ylabel('RMSE')
         ax.grid()
-        trainingSet, = ax.plot(fitHistory.history['loss'], 'b', label = 'Training set')
-        validationSet, = ax.plot(fitHistory.history['val_loss'], 'r', label = 'Validation set')
+        trainingSet, = ax.plot(np.sqrt(fitHistory.history['loss']), 'b', label = 'Training set')
+        validationSet, = ax.plot(np.sqrt(fitHistory.history['val_loss']), 'r', label = 'Validation set')
         plt.legend(handles=[trainingSet, validationSet], labels=['Training set', 'Validation set'], prop={'size': 18})
-        plt.figtext(0.5,  0.010, 'Lowest Validation Crossentropy: {:.5f}'.format(min(fitHistory.history['val_loss'])), size = 18, horizontalalignment = 'center')
+        plt.figtext(0.5,  0.010, 'Lowest Validation RMSE: {:.5f}'.format(np.sqrt(min(fitHistory.history['val_loss']))), size = 18, horizontalalignment = 'center')
         fig.savefig('{}.pdf'.format(self.getSaveString(self.saveFigPath, extra = 'fitHistory')), bbox_inches='tight')
         fig.savefig('{}.png'.format(self.getSaveString(self.saveFigPath, extra = 'fitHistory')), bbox_inches='tight')
 
-        return min(fitHistory.history['val_loss'])
+        return np.sqrt(min(fitHistory.history['val_loss']))
 
     def trainLayer(self, X, nNeurons, nInits):
         if (self.optimizerAlgorithm.upper() == 'SGD'): optimizer = SGD(lr=0.001, momentum=0.00, decay=0.0, nesterov=False)

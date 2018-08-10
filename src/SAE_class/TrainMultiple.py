@@ -10,7 +10,7 @@ def main(asset, force, msg, dev):
     norms = ['mapminmax', 'mapstd']
     for a in asset:
         for norm in norms:
-            args = ['python', 'TrainClassSAE.py', '--asset={}'.format(a), '--inits=10', '--norm={}'.format(norm), '--optimizer=adam', '--outfunc=softmax', '--verbose']
+            args = ['python', 'TrainClassSAE.py', '--asset={}'.format(a), '--inits=10', '--norm={}'.format(norm), '--optimizer=adam', '--verbose']
             args.append('--msg') if msg else args.append('--no-msg')
             if force: args.append('--force')
             if dev: args.append('--dev')
