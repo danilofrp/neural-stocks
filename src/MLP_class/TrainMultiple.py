@@ -3,11 +3,12 @@ import click
 
 @click.command()
 @click.option('--asset', '-a', multiple=True)
+@click.option('--norm', '-n', multiple=True, default = None)
 @click.option('--cv', is_flag=True)
 @click.option('--msg/--no-msg', default = False, help = 'Enables/disables telegram messaging. Defalut False')
 @click.option('--dev', is_flag = True, help = 'Development flag')
-def main(asset, cv, msg, dev):
-    norms = ['mapminmax', 'mapstd']
+def main(asset, norm, cv, msg, dev):
+    norms = norm if norm is not None else ['mapminmax', 'mapstd']
     for a in asset:
         for norm in norms:
             if cv:

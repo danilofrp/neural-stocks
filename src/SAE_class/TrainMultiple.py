@@ -3,11 +3,12 @@ import click
 
 @click.command()
 @click.option('--asset', '-a', multiple=True)
+@click.option('--norm', '-n', multiple=True, default = None)
 @click.option('--force', is_flag = True, help = 'Forces new trainings even if previously trained models exist.')
 @click.option('--msg/--no-msg', default = False, help = 'Enables/disables telegram messaging. Defalut False')
 @click.option('--dev', is_flag = True, help = 'Development flag')
-def main(asset, force, msg, dev):
-    norms = ['mapminmax', 'mapstd']
+def main(asset, norm, force, msg, dev):
+    norms = norm if len(norm) > 0 else ['mapminmax', 'mapstd']
     for a in asset:
         for norm in norms:
             args = ['python', 'TrainClassSAE.py', '--asset={}'.format(a), '--inits=10', '--norm={}'.format(norm), '--optimizer=adam', '--verbose']
