@@ -62,8 +62,9 @@ def plotPredictionsHistogram(asset, saveImg = False, saveDir = ''):
     sae_negative_returns = df[df['{}_Close/Open_returns'.format(asset)] < 0]['2017']['{}_bin_predicted_SAE_mapminmax'.format(asset)].values
     bins = np.linspace(-0.5, 0.5, 30)
 
-    fig, ax = plt.subplots(figsize=(16,8), nrows = 1, ncols = 2)
+    fig, ax = plt.subplots(figsize=(16,8), nrows = 1, ncols = 2, sharey=True)
 
+    ax[0].grid()
     ax[0].hist(mlp_positive_returns, bins, alpha=0.5, label='Retornos Positivos')
     ax[0].hist(mlp_negative_returns, bins, alpha=0.5, label='Retornos Negativos')
     ax[0].set_title('MLP: Histograma de classes previstas')
@@ -71,11 +72,13 @@ def plotPredictionsHistogram(asset, saveImg = False, saveDir = ''):
     ax[0].set_ylabel(u'# de Ocorrências')
     ax[0].legend(prop={'size': 15})
 
+    ax[1].grid()
     ax[1].hist(sae_positive_returns, bins, alpha=0.5, label='Retornos Positivos')
     ax[1].hist(sae_negative_returns, bins, alpha=0.5, label='Retornos Negativos')
     ax[1].set_title('SAE: Histograma de classes previstas')
     ax[1].set_xlabel(u'Saída da Rede')
-    ax[1].set_ylabel(u'# de Ocorrências')
+    plt.setp(ax[1].get_yticklabels(), visible=True)
+    #ax[1].set_ylabel(u'# de Ocorrências')
     ax[1].legend(prop={'size': 15})
 
     if saveImg:
@@ -186,17 +189,15 @@ for asset in assets:
     df = acquireData(filePath = filePath,  dropNan = False)
     # </editor-fold>
 
-    plotSeries([df['{}_Close'.format(asset)]], title = u'Preço de Fechamento', ylabel = 'BRL', initialPlotDate = '', finalPlotDate = '', legend = False, saveImg = True, saveDir = saveDir, saveName = 'historic_close', saveFormat = 'pdf')
+    #plotSeries([df['{}_Close'.format(asset)]], title = u'Preço de Fechamento', ylabel = 'BRL', initialPlotDate = '', finalPlotDate = '', legend = False, saveImg = True, saveDir = saveDir, saveName = 'historic_close', saveFormat = 'pdf')
 
-    plotSeries([df['{}_Close_returns'.format(asset)]], title = u'Log-Retornos do Preço de Fechamento', ylabel = 'BRL', initialPlotDate = '', finalPlotDate = '', legend = True, saveImg = True, saveDir = saveDir, saveName = 'close_log_returns', saveFormat = 'pdf')
+    #plotSeries([df['{}_Close_returns'.format(asset)]], title = u'Log-Retornos do Preço de Fechamento', ylabel = 'BRL', initialPlotDate = '', finalPlotDate = '', legend = True, saveImg = True, saveDir = saveDir, saveName = 'close_log_returns', saveFormat = 'pdf')
 
-    plotDecompose(df, '{}_Close'.format(asset), figsize = (12,8), saveImg = True, saveDir = saveDir)
+    #plotDecompose(df, '{}_Close'.format(asset), figsize = (12,8), saveImg = True, saveDir = saveDir)
 
     plotPredictionsHistogram(asset, saveImg = True, saveDir = saveDir)
 
-    plotBacktest(asset, saveImg = True, saveDir = saveDir)
-
-
+    #plotBacktest(asset, saveImg = True, saveDir = saveDir)
 
 
 
