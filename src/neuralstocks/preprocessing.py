@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import print_function
 import sys, os
 sys.path.append('/home/danilofrp/projeto_final/neural-stocks/src')
@@ -223,7 +224,7 @@ def decompose(df, column, model = 'additive', window = 3, fitOrder = 1, freq = 5
             fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
 
 def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30, weightModel = None, weightModelWindow = None,
-                figsize = (10,10), saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
+                figsize = (10,10), saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf', locale = 'en'):
     df2 = df.copy()
     model = 'multiplicative' if model.startswith('m') else 'additive'
     RMSE = np.empty(windowMaxSize + 1)*np.nan
@@ -235,8 +236,10 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
         else:
             RMSE[i] = np.sqrt(np.square(df2['{}_resid'.format(column)].dropna()).sum()/(len(df2.dropna())))
     fig, ax = plt.subplots(figsize=figsize, nrows = 1, ncols = 1, sharex = True)
-    ax.set_title('DeTrend RMSE per window size', fontsize = 20, fontweight = 'bold')
-    ax.set_xlabel('Window size')
+    title = 'DeTrend RMSE per window size' if locale != 'pt' else u'Análise de RMSE: Busca Paramétrica'
+    xlabel = 'Window size' if locale != 'pt' else u'Amostras passadas usadas para\n a estimação da tendência'
+    ax.set_title(title, fontsize = 20, fontweight = 'bold')
+    ax.set_xlabel(xlabel)
     ax.set_ylabel('RMSE')
     ax.grid()
     ax.plot(range(0,windowMaxSize+1), RMSE, 'bo', markersize=14)
@@ -245,10 +248,12 @@ def deTrendRMSE(df, column, model = 'additive', fitOrder = 1, windowMaxSize = 30
         if RMSE[i] == minValue:
             minIndex = i
     #plt.annotate('local min', size = 18, xy=(minIndex, minValue), xytext=(minIndex*1.1, minValue*1.1), arrowprops=dict(facecolor='black', shrink=0.05))
-    plt.figtext(0.45,  -0.05, 'Minimal RMSE: {:.5f}, using Trend window of {} samples'.format(RMSE[minIndex], minIndex), size = 18, horizontalalignment = 'center')
+    text = 'Minimal RMSE: {:.5f}, using Trend window of {} samples'.format(RMSE[minIndex], minIndex) if locale != 'pt' else u'RMSE Mínimo: {:.5f}, \ncom {} amostras passadas para a tendência'.format(RMSE[minIndex], minIndex)
+    plt.figtext(0.45,  -0.1, text, size = 18, horizontalalignment = 'center')
     if saveImg:
         saveName = saveName if saveName else '{}_deTrendRMSE'.format(df[column].name)
-        fig.savefig('{}/{}.{}'.format(saveDir, saveName, saveFormat), bbox_inches='tight')
+        fig.savefig('{}/{}.pdf'.format(saveDir, saveName), bbox_inches='tight')
+        fig.savefig('{}/{}.png'.format(saveDir, saveName), bbox_inches='tight')
 
 def deSeasonRMSE(df, column, model = 'additive', maxFreq = 20, saveImg = False, saveDir = '', saveName = '', saveFormat = '.pdf'):
     model = 'multiplicative' if model.startswith('m') else 'additive'

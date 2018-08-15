@@ -14,7 +14,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from scipy import signal
 from neuralstocks.utils import *
 
-def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', plotZeroLine = False, saveImg = False, saveDir = '', saveName = '', savePath = None, saveFormat = 'pdf'):
+def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalPlotDate = '', legend = False, plotZeroLine = False, saveImg = False, saveDir = '', saveName = '', savePath = None, saveFormat = 'pdf'):
     """
     Plots the desired Series
 
@@ -63,11 +63,13 @@ def plotSeries(series, title = None, ylabel = None, initialPlotDate = '', finalP
     ax.autoscale(True, axis='x')
     ax.grid()
     fig.autofmt_xdate()
-    plt.legend()
+    if legend:
+        plt.legend()
     if saveImg:
         saveName = saveName if saveName else '{}'.format(series[0].name)
-        savePath = savePath if savePath else '{}/{}.{}'.format(saveDir, saveName, saveFormat)
-        fig.savefig(savePath, bbox_inches='tight')
+        savePath = savePath if savePath else '{}/{}'.format(saveDir, saveName)
+        fig.savefig(savePath + '.png', bbox_inches='tight')
+        fig.savefig(savePath + '.pdf', bbox_inches='tight')
     return fig, ax
 
 def plotReturnSeries(df, column, asset, initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = '', saveName = '', saveFormat = 'pdf'):

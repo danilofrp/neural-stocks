@@ -58,7 +58,7 @@ df = acquireData(filePath = filePath,
 df.tail(1)
 df.columns.values
 
-plotSeries([df['ITUB4_Close']], title = None, initialPlotDate = '2017', finalPlotDate = '2017-03', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
+plotSeries([df['PETR4_Close']], title = u'Preço de Fechamento', ylabel = 'BRL', initialPlotDate = '2000', finalPlotDate = '2017', legend = False, saveImg = True, saveDir = saveDir, saveName = 'historic_close', saveFormat = 'pdf')
 
 plotReturnSeries(df, column = 'Close', asset = asset,  initialPlotDate = '', finalPlotDate = '', saveImg = False, saveDir = saveDir, saveName = '', saveFormat = saveFormat)
 
